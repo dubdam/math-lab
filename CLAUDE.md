@@ -25,7 +25,7 @@ en el navegador (canvas / WebGL).
   distancia al vecino. Sonido en `scripts/flock-audio.ts`. Diagnóstico: `__bandada.advance(s)`.
 - Plantilla común: `layouts/Experiment.astro` + `scripts/lab-ui.ts` (eventos `lab:sound`,
   `lab:info`, `lab:show-hud`, `lab:fullscreen`; teclas S ? H F Esc). Audio base: `scripts/lab-audio.ts`.
-- No publicado todavía: falta config nginx + DNS para math.adamdub.xyz.
+- Publicado en https://math.adamdub.xyz (nginx en `nginx/`, SSL con certbot).
 
 ## Stack
 - Astro static site en `site/` (mismo patrón que vps-estilos); dependencias con bun
