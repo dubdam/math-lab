@@ -13,12 +13,19 @@ en el navegador (canvas / WebGL).
   (Web Audio, pentatónica, nota al cambiar de celda). Panel "?" con la explicación
   matemática y toggle de triangulación de Delaunay (D).
   Baja la cantidad de semillas sola si el frame tarda >12 ms (`window.__voronoi`).
+- `/mandelbrot` — WebGL2 en dos pasadas (`scripts/fractal-gl.ts`: iteraciones a textura
+  float solo cuando cambia la vista, coloreo cada cuadro). Órbita del cursor + período
+  (`scripts/orbit.ts`) dibujada y sonificada (`scripts/mandelbrot-audio.ts`), recuadro
+  Julia (J/Enter), viajes a 6 lugares (V, arranca solo tras 25 s sin tocar).
+  Límite de zoom ~×26.000 (float32). Diagnóstico: `__mandel.bench(span)` / `jump(span, i)`.
+- Plantilla común: `layouts/Experiment.astro` + `scripts/lab-ui.ts` (eventos `lab:sound`,
+  `lab:info`, `lab:show-hud`, `lab:fullscreen`; teclas S ? H F Esc). Audio base: `scripts/lab-audio.ts`.
 - No publicado todavía: falta config nginx + DNS para math.adamdub.xyz.
 
 ## Stack
 - Astro static site en `site/` (mismo patrón que vps-estilos); dependencias con bun
-- Instalado: `d3-delaunay` — celdas de Voronoi / triangulación de Delaunay
-- Previstas: `three.js` (WebGL/3D), `p5.js` (sketches 2D rápidos)
+- Instalado: `d3-delaunay` (Voronoi), `d3-interpolate` (vuelos de cámara del Mandelbrot)
+- Previstas: `three.js` (WebGL/3D)
 
 ## Domain
 math.adamdub.xyz

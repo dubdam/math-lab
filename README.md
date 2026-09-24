@@ -19,4 +19,8 @@ bun run build    # genera site/dist/
 ```
 
 Sitio estático con [Astro](https://astro.build). El Voronoi usa
-[d3-delaunay](https://github.com/d3/d3-delaunay) y Web Audio para el sonido.
+[d3-delaunay](https://github.com/d3/d3-delaunay); el Mandelbrot se dibuja en la GPU con
+WebGL2. El sonido es Web Audio.
+
+Cada experimento usa la plantilla `site/src/layouts/Experiment.astro` (ayuda, botón de
+sonido, panel `?`) y la base de sonido `site/src/scripts/lab-audio.ts`.

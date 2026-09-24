@@ -1,0 +1,660 @@
+---
+// Mandelbrot inmersivo: zoom con rueda/pellizco, órbita del cursor dibujada y tocada
+// como melodía, recuadro con el Julia del punto bajo el cursor y viajes automáticos
+// a lugares famosos.
+import Experiment from '../layouts/Experiment.astro';
+
+const places = [
+  'Valle de los caballitos de mar',
+  'Valle de los elefantes',
+  'Espiral triple',
+  'Minibrot en la antena',
+  'Minibrot escondido',
+  'Tentáculos',
+];
+---
+
+<Experiment title="Mandelbrot" description="El conjunto de Mandelbrot a pantalla completa: zoom, órbitas que suenan y conjuntos de Julia." theme="#000000">
+  <canvas id="gl" class="stage" aria-label="Conjunto de Mandelbrot interactivo"></canvas>
+  <canvas id="overlay" class="stage overlay" aria-hidden="true"></canvas>
+  <p id="caption" class="caption hidden" aria-live="polite"></p>
+  <p id="nogl" class="nogl" hidden>Este experimento necesita WebGL2, y este navegador no lo tiene disponible.</p>
+
+  <Fragment slot="help">
+    <p class="title">MANDELBROT <span id="palette-name"></span></p>
+    <p>arrastrá: mover · rueda o pellizco: zoom · doble clic: acercar (mayús: alejar)</p>
+    <p><kbd>C</kbd> colores · <kbd>J</kbd> Julia · <kbd>Enter</kbd> entrar al Julia · <kbd>O</kbd> órbita · <kbd>V</kbd> viaje · <kbd>S</kbd> sonido · <kbd>F</kbd> pantalla completa · <kbd>espacio</kbd> pausa · <kbd>R</kbd> inicio · <kbd>?</kbd> qué es esto</p>
+  </Fragment>
+
+  <Fragment slot="info">
+    <h2 id="info-title">Conjunto de Mandelbrot</h2>
+
+    <p class="lead">
+      Cada punto de la pantalla es un número <em>c</em>. Empezá en cero y repetí una sola
+      operación: elevar al cuadrado y sumar c. Si el resultado se dispara al infinito, c queda
+      afuera, y el color dice qué tan rápido escapó. Si se queda dando vueltas para siempre,
+      c es parte del conjunto: la zona oscura.
+    </p>
+    <p class="formula">z₀ = 0 → z₁ = z₀² + c → z₂ = z₁² + c → …</p>
+
+    <h3>Números con dos dimensiones</h3>
+    <p>
+      Los puntos del plano son <em>números complejos</em>: tienen una parte horizontal y una
+      vertical. Elevar uno al cuadrado duplica su ángulo y eleva al cuadrado su distancia al
+      centro. Por eso los recorridos giran.
+    </p>
+
+    <h3>La línea que sigue a tu cursor</h3>
+    <p>
+      Es la <em>órbita</em>: el camino z₀, z₁, z₂… del punto donde estás. Si escapa, se va de
+      la pantalla. Si no, queda atrapada. En el cuerpo principal cae en un solo punto; en el
+      bulbo grande de la izquierda salta entre 2 valores; cada bulbo más chico tiene su propio
+      ciclo, de 3, 4, 5 pasos…
+    </p>
+    <p>
+      Con el sonido prendido, cada paso de la órbita es una nota. Adentro de un bulbo vas a
+      escuchar su ciclo como un arpegio que se repite.
+    </p>
+    <button id="orbit-btn" class="toggle" type="button" aria-pressed="true">Ocultar órbita (O)</button>
+
+    <h3>Julia: el mapa dentro del mapa</h3>
+    <p>
+      Misma fórmula, otra pregunta: fijás c y probás todos los puntos de partida. El resultado
+      es un <em>conjunto de Julia</em>. El recuadro de abajo a la derecha muestra el Julia del
+      punto donde está tu cursor. Si c está adentro del Mandelbrot, su Julia es una sola pieza;
+      si está afuera, se desarma en polvo. El Mandelbrot es el índice de todos los Julia.
+    </p>
+    <button id="inset-btn" class="toggle" type="button" aria-pressed="true">Ocultar Julia (J)</button>
+    <button id="julia-btn" class="toggle" type="button">Entrar al Julia (Enter)</button>
+
+    <h3>Copias infinitas</h3>
+    <p>
+      Acercate a cualquier borde y vas a encontrar mini Mandelbrots, espirales y ramas que se
+      parecen al todo sin ser idénticas. El borde es tan enredado que, aunque es una línea,
+      ocupa el plano como una superficie: su dimensión fractal es 2. Lo demostró Mitsuhiro
+      Shishikura en 1998.
+    </p>
+
+    <h3>Viajes</h3>
+    <p>Si no tocás nada por un rato, el viaje empieza solo (tecla V). O elegí un destino:</p>
+    <ul class="places">
+      {places.map((name, i) => (
+        <li><button class="place" type="button" data-place={i}>{name}</button></li>
+      ))}
+    </ul>
+
+    <h3>Un poco de historia</h3>
+    <p>
+      Pierre Fatou y Gaston Julia estudiaron estas repeticiones entre 1917 y 1918, sin
+      computadoras para verlas. Robert Brooks y Peter Matelski publicaron el primer dibujo del
+      conjunto en 1978, hecho con caracteres de impresora. Benoit Mandelbrot lo exploró con las
+      computadoras de IBM en 1980, y en 1982 Adrien Douady y John Hubbard demostraron que es
+      una sola pieza conectada y le pusieron su nombre.
+    </p>
+
+    <h3>Curiosidad: π escondido</h3>
+    <p>
+      En el cuello entre el cuerpo y el bulbo izquierdo, en c = −0,75 + ε·i, contá cuántos pasos
+      tarda en escapar y multiplicalo por ε: cuanto más chico es ε, más se acerca a π. Lo
+      descubrió Dave Boll en 1991.
+    </p>
+
+    <h3>El límite de esta versión</h3>
+    <p>
+      La placa de video calcula con unos 7 dígitos de precisión. Por eso el zoom se frena cerca
+      de ×25.000: más adentro, los puntos vecinos se vuelven indistinguibles y la imagen se
+      pixela. Los zooms «infinitos» de los videos usan trucos de alta precisión.
+    </p>
+  </Fragment>
+
+  <style>
+    #gl { cursor: crosshair; }
+    #gl.grabbing { cursor: grabbing; }
+    #gl.over-inset { cursor: pointer; }
+    .overlay { pointer-events: none; z-index: 0; }
+    .caption {
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 64px;
+      transform: translateX(-50%);
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      text-align: center;
+      white-space: nowrap;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+      transition: opacity 1.5s ease;
+      pointer-events: none;
+    }
+    .caption.hidden { opacity: 0; }
+    .nogl { position: fixed; inset: 40% 20px auto; text-align: center; }
+    .places { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+    .info .toggle + .toggle { margin-left: 6px; }
+  </style>
+
+  <script>
+    import { interpolateZoom } from 'd3-interpolate';
+    import { FractalRenderer, type FractalParams, type Palette, type View } from '../scripts/fractal-gl';
+    import { orbit, describe, type Orbit, type Pt } from '../scripts/orbit';
+    import { MandelbrotAudio } from '../scripts/mandelbrot-audio';
+    import { ignoreKey, showHud } from '../scripts/lab-ui';
+
+    // Paletas de cosenos (a + b·cos(2π(c·t + d))), de Inigo Quilez.
+    const PALETTES: Palette[] = [
+      { name: 'fuego y hielo', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0.0, 0.1, 0.2] },
+      { name: 'prisma', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0.0, 0.33, 0.67] },
+      { name: 'oro', a: [0.8, 0.5, 0.4], b: [0.2, 0.4, 0.2], c: [2, 1, 1], d: [0.0, 0.25, 0.25] },
+      { name: 'atardecer', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1, 0.7, 0.4], d: [0.0, 0.15, 0.2] },
+      { name: 'eléctrico', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [2, 1, 0], d: [0.5, 0.2, 0.25] },
+    ];
+
+    // Destinos verificados: al final del zoom hay estructura, no una zona lisa.
+    const PLACES = [
+      { cx: -0.743643887037151, cy: 0.13182590420533, start: 0.03, end: 2e-4 },
+      { cx: 0.28693186889504513, cy: 0.014286693904085048, start: 0.05, end: 2e-4 },
+      { cx: -0.088, cy: 0.654, start: 0.06, end: 3e-3 },
+      { cx: -1.7548776662466927, cy: 0, start: 0.5, end: 0.06 },
+      { cx: -1.768778833, cy: -0.001738996, start: 0.05, end: 2e-4 },
+      { cx: -0.77568377, cy: 0.13646737, start: 0.02, end: 2e-4 },
+    ];
+    const PLACE_NAMES = Array.from(document.querySelectorAll<HTMLButtonElement>('.place')).map((b) => b.textContent!);
+
+    const HOME: View = { cx: -0.6, cy: 0, span: 2.6 };
+    const JULIA_HOME: View = { cx: 0, cy: 0, span: 3.2 };
+    const MIN_SPAN = 1e-4;
+    const MAX_SPAN = 8;
+    const IDLE_TOUR_S = 25;
+
+    const canvas = document.getElementById('gl') as HTMLCanvasElement;
+    const overlay = document.getElementById('overlay') as HTMLCanvasElement;
+    const octx = overlay.getContext('2d')!;
+    const caption = document.getElementById('caption')!;
+    const paletteName = document.getElementById('palette-name')!;
+    const info = document.getElementById('info')!;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let renderer: FractalRenderer;
+    try {
+      renderer = new FractalRenderer(canvas);
+    } catch (err) {
+      document.getElementById('nogl')!.hidden = false;
+      throw err;
+    }
+
+    const audio = new MandelbrotAudio();
+
+    let W = 0, H = 0, DPR = 1;
+    let view: View = { ...HOME };
+    let targetSpan = view.span;
+    // Punto que queda fijo bajo el cursor mientras el zoom se suaviza.
+    let anchor: { px: number; py: number; ax: number; ay: number } | null = null;
+    let mode: 'mandelbrot' | 'julia' = 'mandelbrot';
+    let juliaC: Pt = [-0.8, 0.156];
+    // Último c bajo el cursor: es el que muestra el recuadro y al que se entra con un clic.
+    let hoverC: Pt = [...juliaC];
+    let savedView: View = { ...HOME };
+    let showInset = true;
+    let showOrbit = true;
+    let paused = false;
+    let paletteIndex = 0;
+    let clock = 0;
+    let lastInput = 0;
+
+    const pointer = { x: 0, y: 0, active: false };
+    const touches = new Map<number, { x: number; y: number }>();
+    let dragDistance = 0;
+
+    let flight: { interp: ReturnType<typeof interpolateZoom>; t: number; dur: number; then?: () => void } | null = null;
+    let tour: { index: number; phase: 'fly' | 'dive' | 'hold'; holdUntil: number; single: boolean } | null = null;
+
+    // --- Coordenadas ---
+    function toComplex(px: number, py: number, v: View = view): Pt {
+      return [v.cx + ((px - W / 2) / H) * v.span, v.cy - ((py - H / 2) / H) * v.span];
+    }
+    function toScreen(z: Pt, v: View = view): Pt {
+      return [W / 2 + ((z[0] - v.cx) / v.span) * H, H / 2 - ((z[1] - v.cy) / v.span) * H];
+    }
+    const clampSpan = (s: number) => Math.min(MAX_SPAN, Math.max(MIN_SPAN, s));
+
+    function insetRect() {
+      const S = Math.round(Math.min(240, Math.min(W, H) * 0.3));
+      return { x: W - S - 16, y: H - S - 16, S };
+    }
+    function overInset(px: number, py: number) {
+      if (!showInset || tour) return false;
+      const r = insetRect();
+      return px >= r.x && px <= r.x + r.S && py >= r.y && py <= r.y + r.S;
+    }
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      for (const c of [canvas, overlay]) {
+        c.width = Math.round(W * DPR);
+        c.height = Math.round(H * DPR);
+      }
+      octx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      lastKey = '';
+    }
+
+    // --- Movimiento de cámara ---
+    function stopAuto() {
+      flight = null;
+      if (tour) {
+        tour = null;
+        caption.classList.add('hidden');
+      }
+    }
+    function zoomAt(px: number, py: number, factor: number) {
+      stopAuto();
+      const [ax, ay] = toComplex(px, py);
+      anchor = { px, py, ax, ay };
+      targetSpan = clampSpan(targetSpan * factor);
+    }
+    function zoomNow(px: number, py: number, factor: number) {
+      const [ax, ay] = toComplex(px, py);
+      view.span = clampSpan(view.span * factor);
+      view.cx = ax - ((px - W / 2) / H) * view.span;
+      view.cy = ay + ((py - H / 2) / H) * view.span;
+      targetSpan = view.span;
+      anchor = null;
+    }
+    function panBy(dx: number, dy: number) {
+      view.cx -= (dx / H) * view.span;
+      view.cy += (dy / H) * view.span;
+      anchor = null;
+    }
+    function flyTo(v: View, then?: () => void) {
+      const interp = interpolateZoom([view.cx, view.cy, view.span], [v.cx, v.cy, v.span]);
+      flight = { interp, t: 0, dur: Math.min(11000, Math.max(2500, interp.duration * 1.6)), then };
+      anchor = null;
+    }
+
+    // --- Viajes ---
+    function showCaption(text: string) {
+      caption.textContent = text;
+      caption.classList.remove('hidden');
+    }
+    function goPlace(index: number, single = false) {
+      if (mode === 'julia') exitJulia();
+      const p = PLACES[index];
+      tour = { index, phase: 'fly', holdUntil: 0, single };
+      showCaption(PLACE_NAMES[index]);
+      flyTo({ cx: p.cx, cy: p.cy, span: p.start }, () => { if (tour) tour.phase = 'dive'; });
+    }
+    function startTour() {
+      goPlace(Math.floor(Math.random() * PLACES.length));
+    }
+    function updateTour(dt: number) {
+      if (!tour || flight) return;
+      const p = PLACES[tour.index];
+      if (tour.phase === 'dive') {
+        view.cx = p.cx;
+        view.cy = p.cy;
+        view.span *= Math.exp(-0.22 * dt);
+        targetSpan = view.span;
+        if (view.span <= p.end) {
+          tour.phase = 'hold';
+          tour.holdUntil = clock + 4;
+          setTimeout(() => caption.classList.add('hidden'), 1500);
+        }
+      } else if (tour.phase === 'hold' && clock > tour.holdUntil) {
+        if (tour.single) tour = null;
+        else goPlace((tour.index + 1) % PLACES.length);
+      }
+    }
+
+    // --- Julia ---
+    function enterJulia(c: Pt) {
+      stopAuto();
+      savedView = { ...view };
+      juliaC = c;
+      mode = 'julia';
+      view = { ...JULIA_HOME };
+      targetSpan = view.span;
+      anchor = null;
+      juliaBtn.textContent = 'Volver al Mandelbrot (Enter)';
+    }
+    function exitJulia() {
+      mode = 'mandelbrot';
+      view = { ...savedView };
+      targetSpan = view.span;
+      anchor = null;
+      juliaBtn.textContent = 'Entrar al Julia (Enter)';
+    }
+    function toggleJulia() {
+      if (mode === 'julia') exitJulia();
+      else enterJulia(hoverC);
+    }
+    // En modo Julia, c "respira" en un círculo diminuto: el Julia se deforma lento.
+    function currentC(): Pt {
+      return [juliaC[0] + 0.003 * Math.cos(clock * 0.35), juliaC[1] + 0.003 * Math.sin(clock * 0.27)];
+    }
+
+    // --- Dibujo ---
+    function maxIterFor(span: number, home: number) {
+      return Math.min(2500, Math.round(200 + 150 * Math.log2(Math.max(1, home / span))));
+    }
+
+    let lastKey = '';
+    let renderedQ = 0;
+    let stillFrames = 0;
+    let moveQuality = 0.75;
+    let frameEma = 16;
+
+    function renderFractal(f: FractalParams, pal: Palette) {
+      const key = `${f.cx},${f.cy},${f.span},${f.julia},${f.c},${f.maxIter},${W},${H}`;
+      const cw = canvas.width, ch = canvas.height;
+      if (!renderer.twoPass) {
+        renderer.drawCombined(f, pal, clock, [0, 0, cw, ch]);
+        return;
+      }
+      if (key !== lastKey) {
+        // En movimiento se calcula a menor resolución; quieto, a resolución completa.
+        renderer.computeIterations(f, Math.round(cw * moveQuality), Math.round(ch * moveQuality));
+        renderedQ = moveQuality;
+        lastKey = key;
+        stillFrames = 0;
+      } else if (renderedQ < 1 && ++stillFrames > 10) {
+        renderer.computeIterations(f, cw, ch);
+        renderedQ = 1;
+      }
+      renderer.drawColors(pal, clock);
+    }
+
+    function renderInset(pal: Palette, c: Pt) {
+      const r = insetRect();
+      const rect = [r.x * DPR, (H - r.y - r.S) * DPR, r.S * DPR, r.S * DPR].map(Math.round);
+      const f: FractalParams = mode === 'mandelbrot'
+        ? { ...JULIA_HOME, julia: true, c, maxIter: 300 }
+        : { ...HOME, span: 2.8, julia: false, c, maxIter: 300 };
+      renderer.drawCombined(f, pal, clock, rect);
+    }
+
+    function drawOverlay(o: Orbit | null, insetC: Pt) {
+      octx.clearRect(0, 0, W, H);
+
+      if (showInset && !tour) {
+        const r = insetRect();
+        octx.strokeStyle = 'rgba(207,231,242,0.5)';
+        octx.lineWidth = 1;
+        octx.strokeRect(r.x + 0.5, r.y + 0.5, r.S - 1, r.S - 1);
+        octx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+        octx.fillStyle = 'rgba(207,231,242,0.8)';
+        octx.textAlign = 'right';
+        const sign = insetC[1] < 0 ? '−' : '+';
+        const label = mode === 'mandelbrot'
+          ? `Julia de c = ${insetC[0].toFixed(3)} ${sign} ${Math.abs(insetC[1]).toFixed(3)}i`
+          : 'Mandelbrot · clic para volver';
+        octx.fillText(label, r.x + r.S, r.y - 8);
+        if (mode === 'julia') {
+          // Marca dónde está c dentro del Mandelbrot.
+          const mv: View = { ...HOME, span: 2.8 };
+          const mx = r.x + r.S / 2 + ((insetC[0] - mv.cx) / mv.span) * r.S;
+          const my = r.y + r.S / 2 - ((insetC[1] - mv.cy) / mv.span) * r.S;
+          octx.beginPath();
+          octx.arc(mx, my, 3.5, 0, Math.PI * 2);
+          octx.fillStyle = '#fff';
+          octx.fill();
+        }
+      }
+
+      if (!o) return;
+      const pts = o.path.map((z) => toScreen(z));
+      octx.lineWidth = 1;
+      octx.strokeStyle = 'rgba(255,255,255,0.55)';
+      octx.beginPath();
+      pts.forEach(([x, y], i) => (i ? octx.lineTo(x, y) : octx.moveTo(x, y)));
+      octx.stroke();
+      octx.fillStyle = '#fff';
+      pts.forEach(([x, y], i) => {
+        octx.globalAlpha = Math.max(0.15, 1 - i / 60);
+        octx.beginPath();
+        octx.arc(x, y, i === 0 ? 3.5 : 2, 0, Math.PI * 2);
+        octx.fill();
+      });
+      octx.globalAlpha = 1;
+
+      octx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+      octx.textAlign = pointer.x > W - 320 ? 'right' : 'left';
+      const lx = pointer.x + (octx.textAlign === 'right' ? -16 : 16);
+      octx.lineWidth = 4;
+      octx.strokeStyle = 'rgba(0,0,0,0.75)';
+      octx.strokeText(describe(o, mode === 'julia'), lx, pointer.y - 14);
+      octx.fillStyle = '#fff';
+      octx.fillText(describe(o, mode === 'julia'), lx, pointer.y - 14);
+    }
+
+    // --- Bucle principal ---
+    let last = performance.now();
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      frameEma += (now - last - frameEma) * 0.1;
+      last = now;
+
+      if (!paused) {
+        clock += dt;
+        if (flight) {
+          flight.t += dt * 1000;
+          const s = Math.min(1, flight.t / flight.dur);
+          const e = s < 0.5 ? 2 * s * s : 1 - (-2 * s + 2) ** 2 / 2;
+          const [cx, cy, span] = flight.interp(e);
+          view = { cx, cy, span };
+          targetSpan = span;
+          if (s >= 1) {
+            const then = flight.then;
+            flight = null;
+            then?.();
+          }
+        }
+        updateTour(dt);
+        if (!tour && !flight && !reducedMotion && mode === 'mandelbrot' && info.hidden && clock - lastInput > IDLE_TOUR_S) {
+          startTour();
+        }
+      }
+
+      // Zoom suave, con el punto bajo el cursor clavado en su lugar.
+      if (!flight && Math.abs(Math.log(targetSpan / view.span)) > 1e-4) {
+        const k = 1 - Math.exp(-dt * 10);
+        view.span = Math.exp(Math.log(view.span) + (Math.log(targetSpan) - Math.log(view.span)) * k);
+        if (anchor) {
+          view.cx = anchor.ax - ((anchor.px - W / 2) / H) * view.span;
+          view.cy = anchor.ay + ((anchor.py - H / 2) / H) * view.span;
+        }
+      }
+
+      const pal = PALETTES[paletteIndex];
+      const julia = mode === 'julia';
+      const c = julia ? currentC() : ([0, 0] as Pt);
+      const home = julia ? JULIA_HOME.span : HOME.span;
+      const moving = lastKey !== '' && !lastKey.startsWith(`${view.cx},${view.cy},${view.span},`);
+      renderFractal({ ...view, julia, c, maxIter: maxIterFor(view.span, home) }, pal);
+
+      // Si la GPU no llega a ~60 fps mientras se mueve, baja la resolución del movimiento.
+      if (moving) {
+        if (frameEma > 24) moveQuality = Math.max(0.35, moveQuality * 0.92);
+        else if (frameEma < 15) moveQuality = Math.min(1, moveQuality * 1.04);
+      }
+
+      const cursorOk = pointer.active && !overInset(pointer.x, pointer.y) && touches.size === 0;
+      if (!julia && cursorOk) hoverC = toComplex(pointer.x, pointer.y);
+      const insetC: Pt = julia ? juliaC : hoverC;
+      if (showInset && !tour) renderInset(pal, insetC);
+
+      let o: Orbit | null = null;
+      if (showOrbit && cursorOk && !tour) {
+        const z = toComplex(pointer.x, pointer.y);
+        o = julia ? orbit(z, c) : orbit([0, 0], z);
+      }
+      drawOverlay(o, insetC);
+
+      // Sonido: la órbita del cursor; durante un viaje, la del centro de la pantalla.
+      const heard = o ?? (tour && !julia ? orbit([0, 0], [view.cx, view.cy]) : null);
+      if (heard) {
+        const loops = heard.escapedAt < 0;
+        audio.setMelody(loops ? heard.cycle : heard.path.slice(1, 25), loops);
+      } else {
+        audio.setMelody([], false);
+      }
+      audio.setDepth(Math.min(1, Math.max(0, Math.log(home / view.span) / Math.log(HOME.span / MIN_SPAN))));
+      audio.tick();
+
+      requestAnimationFrame(frame);
+    }
+
+    // --- Entrada ---
+    const touched = () => { lastInput = clock; };
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      touched();
+      const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? H : 1;
+      zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * unit * 0.0015));
+    }, { passive: false });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      touched();
+      if (e.button !== 0) return;
+      canvas.setPointerCapture(e.pointerId);
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      dragDistance = 0;
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.active = true;
+      if (!overInset(e.clientX, e.clientY)) canvas.classList.add('grabbing');
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      touched();
+      const prev = touches.get(e.pointerId);
+      if (prev && touches.size === 1) {
+        const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+        dragDistance += Math.hypot(dx, dy);
+        if (dragDistance > 4) {
+          stopAuto();
+          panBy(dx, dy);
+        }
+      } else if (prev && touches.size === 2) {
+        // Pellizco: zoom según el cambio de distancia, alrededor del punto medio.
+        const [a, b] = [...touches.entries()].map(([id, p]) => (id === e.pointerId ? { x: e.clientX, y: e.clientY } : p));
+        const [oa, ob] = [...touches.values()];
+        const before = Math.hypot(oa.x - ob.x, oa.y - ob.y);
+        const after = Math.hypot(a.x - b.x, a.y - b.y);
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        stopAuto();
+        panBy(mx - (oa.x + ob.x) / 2, my - (oa.y + ob.y) / 2);
+        if (before > 0 && after > 0) zoomNow(mx, my, before / after);
+        dragDistance += 10;
+      }
+      if (prev) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.active = true;
+      canvas.classList.toggle('over-inset', overInset(e.clientX, e.clientY));
+    });
+
+    function endTouch(e: PointerEvent) {
+      if (!touches.has(e.pointerId)) return;
+      touches.delete(e.pointerId);
+      canvas.classList.remove('grabbing');
+      if (touches.size === 0 && dragDistance < 4 && overInset(e.clientX, e.clientY)) {
+        if (mode === 'julia') exitJulia();
+        else enterJulia(hoverC);
+      }
+      if (e.pointerType !== 'mouse' && touches.size === 0) pointer.active = false;
+    }
+    canvas.addEventListener('pointerup', endTouch);
+    canvas.addEventListener('pointercancel', endTouch);
+    canvas.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'mouse' && touches.size === 0) pointer.active = false;
+    });
+
+    canvas.addEventListener('dblclick', (e) => {
+      if (overInset(e.clientX, e.clientY)) return;
+      zoomAt(e.clientX, e.clientY, e.shiftKey ? 3 : 1 / 3);
+    });
+
+    // --- Botones del panel ---
+    const orbitBtn = document.getElementById('orbit-btn') as HTMLButtonElement;
+    const insetBtn = document.getElementById('inset-btn') as HTMLButtonElement;
+    const juliaBtn = document.getElementById('julia-btn') as HTMLButtonElement;
+
+    function toggleOrbit() {
+      showOrbit = !showOrbit;
+      orbitBtn.setAttribute('aria-pressed', String(showOrbit));
+      orbitBtn.textContent = showOrbit ? 'Ocultar órbita (O)' : 'Mostrar órbita (O)';
+    }
+    function toggleInset() {
+      showInset = !showInset;
+      insetBtn.setAttribute('aria-pressed', String(showInset));
+      insetBtn.textContent = showInset ? 'Ocultar Julia (J)' : 'Mostrar Julia (J)';
+    }
+    function setPalette(i: number) {
+      paletteIndex = i % PALETTES.length;
+      paletteName.textContent = '· ' + PALETTES[paletteIndex].name;
+      audio.setPalette(paletteIndex);
+    }
+
+    orbitBtn.addEventListener('click', toggleOrbit);
+    insetBtn.addEventListener('click', toggleInset);
+    juliaBtn.addEventListener('click', toggleJulia);
+    document.querySelectorAll<HTMLButtonElement>('.place').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.getElementById('info-close')!.click();
+        touched();
+        goPlace(Number(b.dataset.place), true);
+      });
+    });
+    window.addEventListener('lab:sound', (e) => audio.setEnabled((e as CustomEvent<boolean>).detail));
+
+    window.addEventListener('keydown', (e) => {
+      if (ignoreKey(e)) return;
+      touched();
+      switch (e.key.toLowerCase()) {
+        case 'c': setPalette(paletteIndex + 1); showHud(2500); break;
+        case 'j': toggleInset(); break;
+        case 'enter': toggleJulia(); break;
+        case 'o': toggleOrbit(); break;
+        case 'v': if (tour) stopAuto(); else startTour(); break;
+        case 'r':
+          stopAuto();
+          if (mode === 'julia') { view = { ...JULIA_HOME }; targetSpan = view.span; }
+          else flyTo(HOME);
+          break;
+        case '+': case '=': zoomAt(W / 2, H / 2, 1 / 2); break;
+        case '-': case '_': zoomAt(W / 2, H / 2, 2); break;
+        case ' ': paused = !paused; e.preventDefault(); break;
+      }
+    });
+
+    // Diagnóstico desde la consola: __mandel.bench(span) mide cuánto tarda la GPU
+    // en calcular un cuadro completo a esa profundidad en el primer destino.
+    (window as any).__mandel = {
+      bench(span: number, index = 0) {
+        const p = PLACES[index];
+        const f: FractalParams = { cx: p.cx, cy: p.cy, span, julia: false, c: [0, 0], maxIter: maxIterFor(span, HOME.span) };
+        const gl = renderer.gl;
+        const t0 = performance.now();
+        renderer.computeIterations(f, canvas.width, canvas.height);
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+        lastKey = '';
+        return { ms: Math.round(performance.now() - t0), maxIter: f.maxIter, px: `${canvas.width}x${canvas.height}` };
+      },
+      jump(span: number, index = 0) {
+        stopAuto();
+        const p = PLACES[index];
+        view = { cx: p.cx, cy: p.cy, span };
+        targetSpan = span;
+        anchor = null;
+      },
+    };
+
+    window.addEventListener('resize', resize);
+    setPalette(0);
+    resize();
+    requestAnimationFrame(frame);
+  </script>
+</Experiment>

@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "astro": "^6.1.1",
-    "d3-delaunay": "^6.0.4"
+    "d3-delaunay": "^6.0.4",
+    "d3-interpolate": "^3.0.1"
   },
   "devDependencies": {
-    "@types/d3-delaunay": "^6.0.4"
+    "@types/d3-delaunay": "^6.0.4",
+    "@types/d3-interpolate": "^3.0.4"
   }
 }

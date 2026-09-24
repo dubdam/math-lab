@@ -1,0 +1,160 @@
+---
+// Marco común de cada experimento: pantalla completa, ayuda que se desvanece,
+// botones de sonido y "?", y el panel lateral con la explicación.
+// Slots: default (canvas y lo propio), "help" (texto de ayuda), "info" (panel; debe
+// incluir un <h2 id="info-title">).
+interface Props {
+  title: string;
+  description: string;
+  theme?: string;
+}
+const { title, description, theme = '#03060c' } = Astro.props;
+---
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>{title} · math.adamdub.xyz</title>
+  <meta name="description" content={description} />
+  <meta name="theme-color" content={theme} />
+</head>
+<body style={`background:${theme}`}>
+  <slot />
+
+  <a class="hud back" href="/">← lab</a>
+  <div class="hud help" id="help"><slot name="help" /></div>
+
+  <div class="controls">
+    <button id="sound-btn" type="button" aria-pressed="false" title="Sonido (S)">sonido: no</button>
+    <button id="info-btn" type="button" aria-expanded="false" aria-controls="info" title="Qué es esto (?)">?</button>
+  </div>
+
+  <aside id="info" class="info" hidden aria-labelledby="info-title">
+    <button id="info-close" class="close" type="button" aria-label="Cerrar">×</button>
+    <slot name="info" />
+  </aside>
+
+  <style is:global>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      color: #cfe7f2;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .stage {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+    }
+    .hud {
+      position: fixed;
+      z-index: 1;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      transition: opacity 1.2s ease;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+    .hud.hidden { opacity: 0; pointer-events: none; }
+    .back {
+      top: 18px;
+      left: 20px;
+      color: inherit;
+      text-decoration: none;
+      opacity: 0.7;
+    }
+    .back:hover, .back:focus-visible { opacity: 1; }
+    .help {
+      left: 20px;
+      bottom: 18px;
+      max-width: calc(100vw - 40px);
+      pointer-events: none;
+    }
+    .help p { margin: 4px 0; opacity: 0.75; }
+    .help .title { opacity: 1; font-weight: 700; letter-spacing: 0.3em; }
+    .help .title span { font-weight: 400; letter-spacing: 0.1em; opacity: 0.6; }
+    kbd {
+      font-family: inherit;
+      border: 1px solid currentColor;
+      border-radius: 3px;
+      padding: 0 4px;
+      opacity: 0.9;
+    }
+
+    .controls {
+      position: fixed;
+      z-index: 2;
+      top: 14px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .controls button, .info .toggle, .info .close, .info .place {
+      font: inherit;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: inherit;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(207, 231, 242, 0.35);
+      border-radius: 999px;
+      min-height: 36px;
+      min-width: 36px;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: opacity 0.3s, border-color 0.3s;
+    }
+    .controls button { opacity: 0.55; }
+    .controls button:hover, .controls button:focus-visible,
+    .controls button[aria-pressed="true"], .controls button[aria-expanded="true"] {
+      opacity: 1;
+      border-color: rgba(207, 231, 242, 0.8);
+    }
+    #info-btn { padding: 0; font-size: 15px; font-weight: 700; }
+    button:focus-visible { outline: 2px solid #cfe7f2; outline-offset: 2px; }
+
+    .info {
+      position: fixed;
+      z-index: 3;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(440px, 100vw);
+      box-sizing: border-box;
+      padding: 64px 28px 40px;
+      overflow-y: auto;
+      background: rgba(3, 6, 12, 0.82);
+      backdrop-filter: blur(14px);
+      border-left: 1px solid rgba(207, 231, 242, 0.15);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .info[hidden] { display: none; }
+    .info h2 { font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; margin: 0 0 16px; }
+    .info h3 { font-size: 13px; letter-spacing: 0.12em; margin: 28px 0 6px; color: #fff; }
+    .info p, .info li { color: rgba(207, 231, 242, 0.85); }
+    .info .lead { font-size: 15px; color: #e8f6fb; }
+    .info em { font-style: normal; color: #fff; border-bottom: 1px solid rgba(207, 231, 242, 0.4); }
+    .info .formula {
+      font-size: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(207, 231, 242, 0.2);
+      border-radius: 6px;
+    }
+    .info ul { padding-left: 18px; }
+    .info a { color: inherit; }
+    .info .toggle { margin-top: 4px; }
+    .info .toggle[aria-pressed="true"] { border-color: #cfe7f2; background: rgba(207, 231, 242, 0.15); }
+    .info .close { position: absolute; top: 14px; right: 16px; padding: 0; font-size: 18px; }
+  </style>
+
+  <script>
+    import { initLabUi } from '../scripts/lab-ui';
+    initLabUi();
+  </script>
+</body>
+</html>

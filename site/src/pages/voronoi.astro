@@ -1,33 +1,19 @@
 ---
 // Voronoi inmersivo: pantalla completa, semillas a la deriva en un campo de flujo,
 // el cursor es una celda más que deforma a las vecinas.
+import Experiment from '../layouts/Experiment.astro';
 ---
 
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Voronoi · math.adamdub.xyz</title>
-  <meta name="description" content="Celdas de Voronoi a pantalla completa que reaccionan al cursor." />
-  <meta name="theme-color" content="#03060c" />
-</head>
-<body>
-  <canvas id="c" aria-label="Diagrama de Voronoi animado e interactivo"></canvas>
+<Experiment title="Voronoi" description="Celdas de Voronoi a pantalla completa que reaccionan al cursor." theme="#03060c">
+  <canvas id="c" class="stage" aria-label="Diagrama de Voronoi animado e interactivo"></canvas>
 
-  <a class="hud back" href="/">← lab</a>
-  <div class="hud help" id="help">
+  <Fragment slot="help">
     <p class="title">VORONOI <span id="palette-name"></span></p>
     <p>mové el cursor · clic: sembrar · mantené: remolino</p>
     <p><kbd>C</kbd> colores · <kbd>S</kbd> sonido · <kbd>D</kbd> triangulación · <kbd>T</kbd> estela · <kbd>F</kbd> pantalla completa · <kbd>espacio</kbd> pausa · <kbd>R</kbd> reiniciar · <kbd>?</kbd> qué es esto</p>
-  </div>
+  </Fragment>
 
-  <div class="controls">
-    <button id="sound-btn" type="button" aria-pressed="false" title="Sonido (S)">sonido: no</button>
-    <button id="info-btn" type="button" aria-expanded="false" aria-controls="info" title="Qué es esto (?)">?</button>
-  </div>
-
-  <aside id="info" class="info" hidden aria-labelledby="info-title">
-    <button id="info-close" class="close" type="button" aria-label="Cerrar">×</button>
+  <Fragment slot="info">
     <h2 id="info-title">Diagrama de Voronoi</h2>
 
     <p class="lead">
@@ -91,129 +77,16 @@
       Se rehace todo desde cero unas 60 veces por segundo, con cientos de semillas,
       usando la librería <a href="https://github.com/d3/d3-delaunay" target="_blank" rel="noopener">d3-delaunay</a>.
     </p>
-  </aside>
+  </Fragment>
 
-  <style is:global>
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-      background: #03060c;
-      color: #cfe7f2;
-      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    }
-    #c {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      display: block;
-      touch-action: none;
-      cursor: none;
-    }
-    .hud {
-      position: fixed;
-      z-index: 1;
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      transition: opacity 1.2s ease;
-      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
-    }
-    .hud.hidden { opacity: 0; pointer-events: none; }
-    .back {
-      top: 18px;
-      left: 20px;
-      color: inherit;
-      text-decoration: none;
-      opacity: 0.7;
-    }
-    .back:hover, .back:focus-visible { opacity: 1; }
-    .help {
-      left: 20px;
-      bottom: 18px;
-      max-width: calc(100vw - 40px);
-      pointer-events: none;
-    }
-    .help p { margin: 4px 0; opacity: 0.75; }
-    .help .title { opacity: 1; font-weight: 700; letter-spacing: 0.3em; }
-    .help .title span { font-weight: 400; letter-spacing: 0.1em; opacity: 0.6; }
-    .controls {
-      position: fixed;
-      z-index: 2;
-      top: 14px;
-      right: 16px;
-      display: flex;
-      gap: 8px;
-    }
-    .controls button, .info .toggle, .info .close {
-      font: inherit;
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      color: inherit;
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(207, 231, 242, 0.35);
-      border-radius: 999px;
-      min-height: 36px;
-      min-width: 36px;
-      padding: 0 14px;
-      cursor: pointer;
-      backdrop-filter: blur(6px);
-      transition: opacity 0.3s, border-color 0.3s;
-    }
-    .controls button { opacity: 0.55; }
-    .controls button:hover, .controls button:focus-visible,
-    .controls button[aria-pressed="true"], .controls button[aria-expanded="true"] {
-      opacity: 1;
-      border-color: rgba(207, 231, 242, 0.8);
-    }
-    #info-btn { padding: 0; font-size: 15px; font-weight: 700; }
-    button:focus-visible { outline: 2px solid #cfe7f2; outline-offset: 2px; }
-
-    .info {
-      position: fixed;
-      z-index: 3;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: min(440px, 100vw);
-      box-sizing: border-box;
-      padding: 64px 28px 40px;
-      overflow-y: auto;
-      background: rgba(3, 6, 12, 0.82);
-      backdrop-filter: blur(14px);
-      border-left: 1px solid rgba(207, 231, 242, 0.15);
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .info[hidden] { display: none; }
-    .info h2 { font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; margin: 0 0 16px; }
-    .info h3 { font-size: 13px; letter-spacing: 0.12em; margin: 28px 0 6px; color: #fff; }
-    .info p, .info li { color: rgba(207, 231, 242, 0.85); }
-    .info .lead { font-size: 15px; color: #e8f6fb; }
-    .info em { font-style: normal; color: #fff; border-bottom: 1px solid rgba(207, 231, 242, 0.4); }
-    .info .formula {
-      font-size: 12px;
-      padding: 10px 12px;
-      border: 1px solid rgba(207, 231, 242, 0.2);
-      border-radius: 6px;
-    }
-    .info ul { padding-left: 18px; }
-    .info a { color: inherit; }
-    .info .toggle { margin-top: 4px; }
-    .info .toggle[aria-pressed="true"] { border-color: #cfe7f2; background: rgba(207, 231, 242, 0.15); }
-    .info .close { position: absolute; top: 14px; right: 16px; padding: 0; font-size: 18px; }
-    kbd {
-      font-family: inherit;
-      border: 1px solid currentColor;
-      border-radius: 3px;
-      padding: 0 4px;
-      opacity: 0.9;
-    }
+  <style>
+    #c { cursor: none; }
   </style>
 
   <script>
     import { Delaunay } from 'd3-delaunay';
     import { VoronoiAudio } from '../scripts/voronoi-audio';
+    import { ignoreKey, showHud, toggleFullscreen } from '../scripts/lab-ui';
 
     type Seed = { x: number; y: number; vx: number; vy: number; k: number; extra: boolean };
     type Palette = {
@@ -235,8 +108,6 @@
 
     const canvas = document.getElementById('c') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
-    const help = document.getElementById('help')!;
-    const back = document.querySelector('.back') as HTMLElement;
     const paletteName = document.getElementById('palette-name')!;
 
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -512,17 +383,6 @@
       requestAnimationFrame(frame);
     }
 
-    // --- Ayuda en pantalla: se desvanece sola para no romper la inmersión ---
-    let hudTimer = 0;
-    function showHud(ms = 5000) {
-      help.classList.remove('hidden');
-      back.classList.remove('hidden');
-      clearTimeout(hudTimer);
-      hudTimer = window.setTimeout(() => {
-        help.classList.add('hidden');
-        back.classList.add('hidden');
-      }, ms);
-    }
     function setPalette(i: number) {
       paletteIndex = i % PALETTES.length;
       paletteName.textContent = '· ' + PALETTES[paletteIndex].name;
@@ -530,34 +390,15 @@
       audio.setPalette(paletteIndex);
     }
 
-    // --- Sonido, explicación y triangulación ---
-    const soundBtn = document.getElementById('sound-btn') as HTMLButtonElement;
-    const infoBtn = document.getElementById('info-btn') as HTMLButtonElement;
-    const info = document.getElementById('info')!;
-    const infoClose = document.getElementById('info-close') as HTMLButtonElement;
+    // --- Sonido y triangulación (el botón de sonido y el panel viven en la plantilla) ---
     const delaunayBtn = document.getElementById('delaunay-btn') as HTMLButtonElement;
-
-    function toggleSound() {
-      const on = !audio.enabled;
-      audio.setEnabled(on);
-      soundBtn.setAttribute('aria-pressed', String(on));
-      soundBtn.textContent = on ? 'sonido: sí' : 'sonido: no';
-    }
-    function setInfo(open: boolean) {
-      info.hidden = !open;
-      infoBtn.setAttribute('aria-expanded', String(open));
-      if (open) infoClose.focus();
-      else infoBtn.focus();
-    }
     function toggleDelaunay() {
       showDelaunay = !showDelaunay;
       delaunayBtn.setAttribute('aria-pressed', String(showDelaunay));
       delaunayBtn.textContent = showDelaunay ? 'Ocultar triangulación (D)' : 'Mostrar triangulación (D)';
     }
-    soundBtn.addEventListener('click', toggleSound);
-    infoBtn.addEventListener('click', () => setInfo(info.hidden));
-    infoClose.addEventListener('click', () => setInfo(false));
     delaunayBtn.addEventListener('click', toggleDelaunay);
+    window.addEventListener('lab:sound', (e) => audio.setEnabled((e as CustomEvent<boolean>).detail));
 
     // --- Entrada ---
     canvas.addEventListener('pointermove', (e) => {
@@ -590,35 +431,20 @@
     });
     canvas.addEventListener('dblclick', toggleFullscreen);
 
-    function toggleFullscreen() {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen?.().catch(() => {});
-    }
-
     window.addEventListener('keydown', (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      // Espacio/Enter sobre un botón lo activan; no deben pausar la animación.
-      if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
+      if (ignoreKey(e)) return;
       switch (e.key.toLowerCase()) {
         case 'c': setPalette(paletteIndex + 1); showHud(2500); break;
         case 't': trails = !trails; break;
-        case 'f': toggleFullscreen(); break;
         case 'r': reset(); break;
-        case 's': toggleSound(); break;
         case 'd': toggleDelaunay(); break;
-        case '?': setInfo(info.hidden); break;
-        case 'escape': if (!info.hidden) setInfo(false); break;
-        case 'h': showHud(); break;
         case ' ': paused = !paused; e.preventDefault(); break;
-        default: return;
       }
     });
 
     window.addEventListener('resize', resize);
     setPalette(0);
     resize();
-    showHud(6000);
     requestAnimationFrame(frame);
   </script>
-</body>
-</html>
+</Experiment>
