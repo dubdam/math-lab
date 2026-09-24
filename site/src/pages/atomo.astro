@@ -1,0 +1,1095 @@
+---
+// Átomo de hidrógeno inmersivo: el electrón como nube de probabilidad (WebGL), la escalera
+// de niveles de energía a escala, y cada salto como un fotón del color exacto que cae en
+// el espectro. Modo contemplar (salta solo), modo jugar (subirlo con luz) y modelo de Bohr.
+import Experiment from '../layouts/Experiment.astro';
+
+const levels = [1, 2, 3, 4, 5, 6];
+---
+
+<Experiment title="Átomo" description="El electrón del hidrógeno como nube de probabilidad. Cada salto entre niveles emite o absorbe luz de un color exacto." theme="#04060f">
+  <canvas id="gl" class="stage" aria-label="Orbital del electrón del hidrógeno, interactivo"></canvas>
+  <canvas id="overlay" class="stage overlay" aria-hidden="true"></canvas>
+  <p id="nogl" class="nogl" hidden>Este experimento necesita WebGL2, y este navegador no lo tiene disponible.</p>
+
+  <div class="top">
+    <p id="status" class="status" aria-live="polite"></p>
+    <div class="modes" role="group" aria-label="Modo">
+      <button id="mode-watch" type="button" aria-pressed="true">contemplar</button>
+      <button id="mode-play" type="button" aria-pressed="false">jugar</button>
+    </div>
+    <p id="goal" class="goal" hidden></p>
+    <p id="caption" class="caption hidden" aria-live="polite"></p>
+  </div>
+
+  <p id="toast" class="toast hidden" aria-live="polite"></p>
+
+  <div class="levels" id="levels" aria-label="Nivel de energía">
+    {levels.map((n) => <button type="button" data-level={n} aria-label={`Nivel ${n}`}>{n}</button>)}
+  </div>
+
+  <div class="spectrum" id="spectrum">
+    <canvas id="bar" aria-label="Espectro: clic para mandar un fotón de ese color"></canvas>
+    <span class="lbl l-uv">UV</span>
+    <span class="lbl l-ir">IR</span>
+    <span id="bar-tip" class="tip hidden"></span>
+  </div>
+
+  <Fragment slot="help">
+    <p class="title">ÁTOMO <span id="palette-name"></span></p>
+    <p>arrastrá: girar · clic en la nube: perturbar · clic en el espectro: mandar un fotón de ese color</p>
+    <p><kbd>1</kbd>…<kbd>6</kbd> nivel · <kbd>G</kbd> jugar · <kbd>B</kbd> modelo de Bohr · <kbd>C</kbd> colores · <kbd>←</kbd><kbd>→</kbd> <kbd>Enter</kbd> fotón · <kbd>S</kbd> sonido · <kbd>F</kbd> pantalla completa · <kbd>espacio</kbd> pausa · <kbd>R</kbd> reiniciar · <kbd>?</kbd> qué es esto</p>
+  </Fragment>
+
+  <Fragment slot="info">
+    <h2 id="info-title">Átomo de hidrógeno</h2>
+
+    <p class="lead">
+      El electrón no gira alrededor del núcleo como un planeta. Lo que ves es una nube:
+      donde hay más puntos, más probable es encontrarlo si lo buscás. La nube solo puede tener
+      ciertas formas exactas, y cambiar de una a otra cuesta, o libera, una cantidad exacta de
+      luz.
+    </p>
+
+    <h3>La escalera</h3>
+    <p>
+      Los botones de la izquierda son los niveles de energía. Las líneas los conectan con su
+      altura real: los peldaños se amontonan hacia arriba, porque la energía de cada nivel es
+      −13,6 eV dividido por n². Arriba de todo, a 0 eV, el electrón queda libre y el átomo se
+      ioniza.
+    </p>
+    <p class="formula">Eₙ = −13,6 eV / n²</p>
+
+    <h3>El salto</h3>
+    <p>
+      El electrón no viaja de un nivel a otro: la nube se reacomoda. Al bajar, la diferencia de
+      energía sale en un solo <em>fotón</em>, una partícula de luz, y esa energía fija su color.
+      Al subir, tiene que llegar un fotón con exactamente esa energía: uno de otro color pasa de
+      largo. Cada fotón emitido cae en el espectro de abajo y deja una línea.
+    </p>
+    <p class="formula">1/λ = R · (1/n<sub>f</sub>² − 1/n<sub>i</sub>²)</p>
+    <p>
+      Los saltos que terminan en n = 2 son la <em>serie de Balmer</em>, la única visible: rojo
+      (3 → 2), turquesa (4 → 2), azul (5 → 2), violeta (6 → 2). Los que terminan en n = 1
+      son ultravioleta; los que terminan en 3 o más, infrarrojo.
+    </p>
+
+    <h3>La huella digital</h3>
+    <p>
+      Ese código de barras es la firma del hidrógeno: ningún otro átomo tiene esas líneas. Los
+      astrónomos lo usan para saber de qué están hechas las estrellas y a qué velocidad se
+      alejan. El rojo de las nebulosas es la línea de 656 nm. Y el helio se descubrió en el Sol
+      en 1868, por una línea que nadie había visto en la Tierra.
+    </p>
+
+    <h3>Las formas</h3>
+    <p>
+      Los orbitales se llaman con el número del nivel y una letra: <em>s</em> esfera,
+      <em>p</em> dos lóbulos, <em>d</em> cuatro lóbulos o un anillo, <em>f</em> y más allá,
+      flores. Los dos colores de la nube son el signo de la función de onda, positivo de un lado
+      y negativo del otro, separados por superficies donde el electrón nunca está.
+    </p>
+    <p>
+      Un fotón se lleva una unidad de giro. Por eso en cada salto la letra cambia en un paso
+      (s ↔ p ↔ d ↔ f). Cuando un orbital <em>f</em> tiene que bajar a n = 1, no puede en un
+      solo salto: cae en cascada, y salen varios fotones seguidos.
+    </p>
+
+    <h3>Jugar</h3>
+    <p>
+      El objetivo es llevar el electrón al nivel que se pide, mandándole luz desde el espectro.
+      Solo lo absorbe si el color coincide con un salto posible desde donde está; si no, el
+      fotón pasa de largo. Desde n = 1, todos los saltos son ultravioleta; desde n = 2, los
+      colores visibles. Y el electrón no espera: a los pocos segundos vuelve a caer.
+    </p>
+    <button id="play-btn" class="toggle" type="button" aria-pressed="false">Jugar (G)</button>
+
+    <h3>Bohr contra Schrödinger</h3>
+    <p>
+      En 1913, Niels Bohr propuso órbitas circulares con radios fijos, y con eso explicó los
+      colores de Balmer. Pero las órbitas no explican las formas de los orbitales ni por qué
+      unas líneas brillan más que otras. En 1926, Erwin Schrödinger reemplazó la órbita por
+      una onda, y de ahí salen estas nubes. Alterná para comparar.
+    </p>
+    <button id="bohr-btn" class="toggle" type="button" aria-pressed="false">Modelo de Bohr (B)</button>
+
+    <h3>El sonido</h3>
+    <p>
+      Cada fotón suena como una nota de frecuencia proporcional a la de la luz: la misma luz,
+      41 octavas más grave. Así, los intervalos que escuchás son los intervalos reales entre las
+      líneas del hidrógeno.
+    </p>
+
+    <h3>Un poco de historia</h3>
+    <p>
+      Johann Balmer, un maestro de escuela suizo de 60 años, encontró en 1885 la fórmula de las
+      cuatro líneas visibles jugando con números, sin saber por qué funcionaba. Johannes
+      Rydberg la generalizó en 1888. Bohr la explicó en 1913, y Schrödinger en 1926 la dedujo
+      de una ecuación. La constante de Rydberg es hoy una de las cantidades medidas con más
+      precisión de toda la física.
+    </p>
+
+    <h3>Lo que esta versión simplifica</h3>
+    <p>
+      El electrón real tarda nanosegundos en caer; acá, segundos. No hay espín ni estructura
+      fina, y los orbitales de un mismo nivel se eligen al azar. El tamaño sí es real: la nube
+      de n = 6 es unas cuarenta veces más grande que la de n = 1, y la escala de abajo a la
+      derecha lo muestra.
+    </p>
+  </Fragment>
+
+  <style>
+    #gl { cursor: grab; }
+    #gl.grabbing { cursor: grabbing; }
+    .overlay { pointer-events: none; z-index: 0; }
+    .nogl { position: fixed; inset: 40% 20px auto; text-align: center; }
+    :global(.help) { bottom: 84px; left: 64px; }
+
+    .top {
+      position: fixed;
+      z-index: 1;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+      max-width: min(60vw, 560px);
+    }
+    .status {
+      margin: 0 0 8px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+    .modes { display: inline-flex; pointer-events: auto; border: 1px solid rgba(207, 231, 242, 0.35); border-radius: 999px; overflow: hidden; backdrop-filter: blur(6px); }
+    .modes button {
+      font: inherit;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: inherit;
+      background: rgba(0, 0, 0, 0.45);
+      border: 0;
+      min-height: 30px;
+      padding: 0 14px;
+      cursor: pointer;
+      opacity: 0.6;
+    }
+    .modes button[aria-pressed="true"] { opacity: 1; background: rgba(207, 231, 242, 0.18); }
+    .modes button:hover { opacity: 1; }
+    .goal { margin: 10px 0 0; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); }
+    .goal b { color: #fff; }
+
+    .toast {
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      top: 24%;
+      transform: translateX(-50%);
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .toast.hidden { opacity: 0; }
+    .caption {
+      margin: 12px 0 0;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      white-space: nowrap;
+      opacity: 0.85;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+      transition: opacity 1s ease;
+    }
+    .caption.hidden { opacity: 0; }
+
+    .levels {
+      position: fixed;
+      z-index: 1;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column-reverse;
+      gap: clamp(10px, 4.6vh, 36px);
+    }
+    .levels button {
+      font: inherit;
+      font-size: 12px;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border-radius: 50%;
+      color: inherit;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(207, 231, 242, 0.35);
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .levels button:hover, .levels button:focus-visible { opacity: 1; }
+    .levels button[aria-current="true"] { opacity: 1; border-color: #fff; box-shadow: 0 0 12px rgba(207, 231, 242, 0.6); }
+    .levels.locked button:not([aria-current="true"]) { opacity: 0.3; cursor: default; }
+
+    .spectrum {
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      width: min(760px, calc(100vw - 48px));
+      height: 40px;
+      border-radius: 4px;
+      overflow: visible;
+      cursor: crosshair;
+    }
+    .spectrum canvas { display: block; width: 100%; height: 100%; border-radius: 4px; }
+    .lbl { position: absolute; top: -16px; font-size: 10px; letter-spacing: 0.2em; opacity: 0.55; pointer-events: none; }
+    .l-uv { left: 2px; }
+    .l-ir { right: 2px; }
+    .tip {
+      position: absolute;
+      bottom: 46px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .tip.hidden { opacity: 0; }
+    .info .toggle + .toggle { margin-left: 6px; }
+    .info sub { font-size: 0.75em; }
+  </style>
+
+  <script>
+    import {
+      sampleOrbital, jumpPath, line, energy, orbitalName, meanRadius, wavelengthToRgb, rgbCss,
+      LINES, MAX_N, A0_NM, type Orbital, type Cloud, type Line,
+    } from '../scripts/hydrogen';
+    import { OrbitalRenderer, rotation } from '../scripts/orbital-gl';
+    import { AtomAudio } from '../scripts/atom-audio';
+    import { ignoreKey, showHud } from '../scripts/lab-ui';
+
+    type Rgb = [number, number, number];
+    const PALETTES: { name: string; pos: Rgb; neg: Rgb }[] = [
+      { name: 'fase', pos: [0.56, 0.89, 1.0], neg: [1.0, 0.7, 0.54] },
+      { name: 'plasma', pos: [1.0, 0.48, 0.84], neg: [0.48, 0.61, 1.0] },
+      { name: 'hielo', pos: [0.87, 0.96, 1.0], neg: [0.6, 0.78, 0.86] },
+    ];
+    const BG: Rgb = [0.016, 0.024, 0.06];
+    const MORPH_S = 1.1;
+    const PHOTON_SPEED = 720;
+    /** Tolerancia relativa para que un fotón "coincida" con un salto. */
+    const TOL = 0.035;
+    // Espectro: UV y IR en escala logarítmica a los costados, visible lineal en el medio.
+    const UV_MIN = 80, VIS_MIN = 380, VIS_MAX = 750, IR_MAX = 8000, UV_W = 0.2, IR_W = 0.16;
+    const BALMER = [line(3, 2), line(4, 2), line(5, 2), line(6, 2)];
+
+    const canvas = document.getElementById('gl') as HTMLCanvasElement;
+    const overlay = document.getElementById('overlay') as HTMLCanvasElement;
+    const octx = overlay.getContext('2d')!;
+    const bar = document.getElementById('bar') as HTMLCanvasElement;
+    const bctx = bar.getContext('2d')!;
+    const spectrum = document.getElementById('spectrum')!;
+    const barTip = document.getElementById('bar-tip')!;
+    const status = document.getElementById('status')!;
+    const goal = document.getElementById('goal')!;
+    const toast = document.getElementById('toast')!;
+    const caption = document.getElementById('caption')!;
+    const paletteName = document.getElementById('palette-name')!;
+    const levelsBox = document.getElementById('levels')!;
+    const levelBtns = Array.from(levelsBox.querySelectorAll<HTMLButtonElement>('button'));
+    const modeWatch = document.getElementById('mode-watch') as HTMLButtonElement;
+    const modePlay = document.getElementById('mode-play') as HTMLButtonElement;
+    const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
+    const bohrBtn = document.getElementById('bohr-btn') as HTMLButtonElement;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isTouch = matchMedia('(pointer: coarse)').matches;
+    const POINTS = Math.round(Math.min(26000, Math.max(9000, (innerWidth * innerHeight) / 45)));
+
+    let renderer: OrbitalRenderer;
+    try {
+      renderer = new OrbitalRenderer(canvas, BG);
+    } catch (err) {
+      document.getElementById('nogl')!.hidden = false;
+      throw err;
+    }
+    const audio = new AtomAudio();
+
+    let W = 0, H = 0, DPR = 1;
+    let clock = 0;
+    let paused = false;
+    let paletteIndex = 0;
+    let bohr = false;
+    let mode: 'watch' | 'play' = 'watch';
+
+    // --- Estado del electrón ---
+    let cur: Orbital = { n: 1, l: 0, m: 0 };
+    let curCloud: Cloud;
+    let mix = 1;
+    let morphT = MORPH_S;
+    /** Saltos pendientes de una cascada. */
+    let queue: Orbital[] = [];
+    let decayAt = Infinity;
+    let exciteAt = 2;
+    let lifeStart = 0;
+    let lifetime = 1;
+    let bohrAngle = 0;
+
+    // --- Cámara ---
+    let yaw = 0.5, pitch = 0.35;
+    let scale = 60, targetScale = 60;
+    const drag = { on: false, x: 0, y: 0, moved: 0 };
+
+    // --- Espectro ---
+    const emitted = new Map<string, number>();
+    let barW = 0, barH = 0;
+    let barGrad: HTMLCanvasElement | null = null;
+    let barCursor = -1;
+    let barHover = -1;
+    /** La etiqueta del cursor de teclado se muestra unos segundos después de moverlo. */
+    let tipUntil = 0;
+    let hintUntil = 0;
+    const flashes: { u: number; t: number; color: Rgb }[] = [];
+
+    // --- Fotones ---
+    type Photon = {
+      x: number; y: number; dx: number; dy: number; dist: number;
+      nm: number; color: Rgb; phase: number;
+      kind: 'out' | 'in' | 'through';
+      target: Orbital | null;
+    };
+    const photons: Photon[] = [];
+
+    const game = { target: 0, score: 0, misses: 0, nextAt: 0 };
+
+    const fmt = (x: number, d = 1) => x.toFixed(d).replace('.', ',');
+    const fmtNm = (nm: number) => Math.round(nm).toLocaleString('es-AR');
+    const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+    const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+
+    // --- Nubes ---
+    const cache = new Map<string, Cloud>();
+    function cloudOf(o: Orbital) {
+      const key = `${o.n},${o.l},${o.m}`;
+      let c = cache.get(key);
+      if (!c) {
+        c = sampleOrbital(o, POINTS);
+        if (cache.size > 14) cache.delete(cache.keys().next().value!);
+        cache.set(key, c);
+      }
+      return c;
+    }
+    function fitScale(c: Cloud) {
+      const room = Math.min(W - 260, H - 170, Math.max(W, H));
+      return (0.42 * Math.max(240, room)) / Math.max(c.r97, c.orbital.n ** 2);
+    }
+
+    // --- Espectro ---
+    function barU(nm: number) {
+      if (nm < VIS_MIN) return UV_W * (Math.log(nm / UV_MIN) / Math.log(VIS_MIN / UV_MIN));
+      if (nm <= VIS_MAX) return UV_W + (1 - UV_W - IR_W) * ((nm - VIS_MIN) / (VIS_MAX - VIS_MIN));
+      return 1 - IR_W + IR_W * (Math.log(nm / VIS_MAX) / Math.log(IR_MAX / VIS_MAX));
+    }
+    function barNm(u: number) {
+      u = Math.min(1, Math.max(0, u));
+      if (u < UV_W) return UV_MIN * (VIS_MIN / UV_MIN) ** (u / UV_W);
+      if (u <= 1 - IR_W) return VIS_MIN + (VIS_MAX - VIS_MIN) * ((u - UV_W) / (1 - UV_W - IR_W));
+      return VIS_MAX * (IR_MAX / VIS_MAX) ** ((u - (1 - IR_W)) / IR_W);
+    }
+    function barPoint(nm: number): [number, number] {
+      const r = spectrum.getBoundingClientRect();
+      return [r.left + barU(nm) * r.width, r.top + r.height / 2];
+    }
+    function nearestLine(nm: number, from?: number) {
+      let best: Line | null = null, bestD = Infinity;
+      for (const l of LINES) {
+        if (from !== undefined && l.nf !== from) continue;
+        const d = Math.abs(l.nm - nm) / l.nm;
+        if (d < bestD) { bestD = d; best = l; }
+      }
+      return { line: best, d: bestD };
+    }
+
+    function buildBarGradient() {
+      barGrad = document.createElement('canvas');
+      barGrad.width = Math.round(barW * DPR);
+      barGrad.height = Math.round(barH * DPR);
+      const g = barGrad.getContext('2d')!;
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      for (let x = 0; x < barW; x++) {
+        const nm = barNm((x + 0.5) / barW);
+        const vis = nm >= VIS_MIN && nm <= VIS_MAX;
+        g.fillStyle = rgbCss(wavelengthToRgb(nm), vis ? 0.5 : 0.22);
+        g.fillRect(x, 0, 1.5, barH);
+      }
+      g.fillStyle = 'rgba(207,231,242,0.35)';
+      g.fillRect(UV_W * barW, 0, 1, barH);
+      g.fillRect((1 - IR_W) * barW, 0, 1, barH);
+    }
+
+    function drawBar() {
+      if (!barGrad) return;
+      bctx.setTransform(1, 0, 0, 1, 0, 0);
+      bctx.clearRect(0, 0, bar.width, bar.height);
+      bctx.drawImage(barGrad, 0, 0);
+      bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+      for (const [key, count] of emitted) {
+        const [ni, nf] = key.split('-').map(Number);
+        const ln = line(ni, nf);
+        const x = barU(ln.nm) * barW;
+        const c = wavelengthToRgb(ln.nm);
+        const a = Math.min(1, 0.5 + count * 0.12);
+        bctx.fillStyle = rgbCss(c, a * 0.35);
+        bctx.fillRect(x - 3, 0, 6, barH);
+        bctx.fillStyle = rgbCss([Math.min(1, c[0] + 0.35), Math.min(1, c[1] + 0.35), Math.min(1, c[2] + 0.35)], a);
+        bctx.fillRect(x - 1, 0, 2, barH);
+      }
+      for (let i = flashes.length - 1; i >= 0; i--) {
+        const f = flashes[i];
+        const age = clock - f.t;
+        if (age > 0.7) { flashes.splice(i, 1); continue; }
+        const k = 1 - age / 0.7;
+        bctx.fillStyle = rgbCss([1, 1, 1], k * 0.8);
+        bctx.fillRect(f.u * barW - 1 - 6 * (1 - k), 0, 2 + 12 * (1 - k), barH);
+      }
+      if (clock < hintUntil) {
+        bctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        bctx.setLineDash([3, 3]);
+        bctx.lineWidth = 1;
+        for (const l of LINES) {
+          if (l.nf !== cur.n) continue;
+          const x = Math.round(barU(l.nm) * barW) + 0.5;
+          bctx.beginPath();
+          bctx.moveTo(x, 0);
+          bctx.lineTo(x, barH);
+          bctx.stroke();
+        }
+        bctx.setLineDash([]);
+      }
+      const u = barHover >= 0 ? barHover : barCursor;
+      if (u >= 0) {
+        const x = Math.round(u * barW) + 0.5;
+        bctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        bctx.lineWidth = 1;
+        bctx.beginPath();
+        bctx.moveTo(x, -4);
+        bctx.lineTo(x, barH + 4);
+        bctx.stroke();
+      }
+    }
+
+    function updateTip() {
+      const u = barHover >= 0 ? barHover : clock < tipUntil ? barCursor : -1;
+      if (u < 0) { barTip.classList.add('hidden'); return; }
+      const nm = barNm(u);
+      const { line: ln, d } = nearestLine(nm);
+      let text = `${fmtNm(nm)} nm`;
+      if (ln && d < 0.015) text += ` · ${ln.name} (${ln.ni} → ${ln.nf})`;
+      barTip.textContent = text;
+      barTip.style.left = `${u * 100}%`;
+      barTip.classList.remove('hidden');
+    }
+
+    // --- Escalera ---
+    const ladder = { x0: 0, x1: 0, yInf: 0, ys: [] as number[], btnY: [] as number[], btnX: 0 };
+    let markerY = 0;
+    function layoutLadder() {
+      const rects = levelBtns.map((b) => b.getBoundingClientRect());
+      ladder.btnY = rects.map((r) => r.top + r.height / 2);
+      ladder.btnX = rects[0].right;
+      const y1 = ladder.btnY[0];
+      ladder.yInf = ladder.btnY[MAX_N - 1] - 20;
+      ladder.ys = levelBtns.map((_, i) => y1 + (ladder.yInf - y1) * (1 - 1 / ((i + 1) * (i + 1))));
+      ladder.x0 = ladder.btnX + 24;
+      ladder.x1 = ladder.x0 + 30;
+      if (!markerY) markerY = ladder.ys[cur.n - 1];
+    }
+
+    function drawLadder(dt: number) {
+      if (!ladder.ys.length) return;
+      const { x0, x1 } = ladder;
+      octx.lineWidth = 1;
+      for (let i = 0; i < MAX_N; i++) {
+        const on = i + 1 === cur.n;
+        octx.strokeStyle = `rgba(207,231,242,${on ? 0.5 : 0.16})`;
+        octx.beginPath();
+        octx.moveTo(ladder.btnX + 3, ladder.btnY[i]);
+        octx.bezierCurveTo(ladder.btnX + 14, ladder.btnY[i], x0 - 10, ladder.ys[i], x0, ladder.ys[i]);
+        octx.stroke();
+        octx.strokeStyle = `rgba(207,231,242,${on ? 0.95 : 0.45})`;
+        octx.lineWidth = on ? 2 : 1;
+        octx.beginPath();
+        octx.moveTo(x0, ladder.ys[i]);
+        octx.lineTo(x1, ladder.ys[i]);
+        octx.stroke();
+        octx.lineWidth = 1;
+      }
+      octx.setLineDash([3, 4]);
+      octx.strokeStyle = 'rgba(207,231,242,0.3)';
+      octx.beginPath();
+      octx.moveTo(x0, ladder.yInf);
+      octx.lineTo(x1, ladder.yInf);
+      octx.stroke();
+      octx.setLineDash([]);
+
+      octx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+      octx.textBaseline = 'middle';
+      octx.fillStyle = 'rgba(207,231,242,0.55)';
+      octx.fillText('0 eV · libre', x1 + 8, ladder.yInf);
+      octx.fillText('−13,6 eV', x1 + 8, ladder.ys[0]);
+      octx.fillText('−3,4', x1 + 8, ladder.ys[1]);
+      octx.fillText('−1,5', x1 + 8, ladder.ys[2]);
+
+      // Marcador del electrón, con el anillo de vida que se consume hasta la caída.
+      markerY += (ladder.ys[cur.n - 1] - markerY) * Math.min(1, dt * 8);
+      const mx = (x0 + x1) / 2;
+      const g = octx.createRadialGradient(mx, markerY, 0, mx, markerY, 12);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)');
+      g.addColorStop(0.3, 'rgba(180,230,255,0.5)');
+      g.addColorStop(1, 'rgba(180,230,255,0)');
+      octx.fillStyle = g;
+      octx.fillRect(mx - 12, markerY - 12, 24, 24);
+      if (decayAt < Infinity && queue.length === 0) {
+        const left = Math.max(0, Math.min(1, (decayAt - clock) / lifetime));
+        octx.strokeStyle = 'rgba(255,255,255,0.7)';
+        octx.lineWidth = 1.5;
+        octx.beginPath();
+        octx.arc(mx, markerY, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+        octx.stroke();
+      }
+    }
+
+    // --- Fotones ---
+    function spawn(from: [number, number], to: [number, number], nm: number, kind: Photon['kind'], target: Orbital | null) {
+      const dx = to[0] - from[0], dy = to[1] - from[1];
+      const dist = Math.hypot(dx, dy) || 1;
+      photons.push({ x: from[0], y: from[1], dx: dx / dist, dy: dy / dist, dist, nm, color: wavelengthToRgb(nm), phase: Math.random() * 6, kind, target });
+    }
+    function emitPhoton(ln: Line) {
+      spawn([W / 2, H / 2], barPoint(ln.nm), ln.nm, 'out', null);
+    }
+    function incomingPhoton(nm: number, target: Orbital | null) {
+      spawn(barPoint(nm), [W / 2, H / 2], nm, 'in', target);
+    }
+    function panOf(nm: number) {
+      return (barU(nm) * 2 - 1) * 0.7;
+    }
+
+    function updatePhotons(dt: number) {
+      const step = PHOTON_SPEED * dt;
+      for (let i = photons.length - 1; i >= 0; i--) {
+        const p = photons[i];
+        p.phase += dt * 28;
+        const move = Math.min(step, p.dist);
+        p.x += p.dx * move;
+        p.y += p.dy * move;
+        p.dist -= move;
+        if (p.kind === 'through') {
+          if (p.x < -80 || p.x > W + 80 || p.y < -80 || p.y > H + 80) photons.splice(i, 1);
+          continue;
+        }
+        if (p.dist > 0.5) continue;
+        if (p.kind === 'out') {
+          flashes.push({ u: barU(p.nm), t: clock, color: p.color });
+          photons.splice(i, 1);
+        } else if (p.target) {
+          const ln = line(p.target.n, cur.n);
+          audio.photon(ln.dE, 'absorb', panOf(ln.nm));
+          say(`absorbido · ${ln.name} · ${fmtNm(ln.nm)} nm · ${cur.n} → ${p.target.n}`);
+          applyJump(p.target);
+          photons.splice(i, 1);
+        } else {
+          resolve(p);
+        }
+      }
+    }
+
+    /** Un fotón mandado desde el espectro llega al átomo: ¿coincide con algún salto? */
+    function resolve(p: Photon) {
+      const { line: ln, d } = nearestLine(p.nm, cur.n);
+      if (ln && d < TOL) {
+        const target = jumpPath(cur, ln.ni)[0];
+        audio.photon(ln.dE, 'absorb', panOf(ln.nm));
+        say(`absorbido · ${ln.name} · ${fmtNm(ln.nm)} nm · ${cur.n} → ${ln.ni}`);
+        game.misses = 0;
+        applyJump(target);
+        photons.splice(photons.indexOf(p), 1);
+        return;
+      }
+      p.kind = 'through';
+      p.dist = 4000;
+      audio.miss();
+      say(`${fmtNm(p.nm)} nm pasa de largo: no coincide con ningún salto desde n = ${cur.n}`);
+      if (mode === 'play') {
+        game.misses++;
+        if (game.misses >= 2) hintUntil = clock + 5;
+      }
+    }
+
+    function drawPhoton(p: Photon) {
+      const len = 66, amp = 6;
+      const lam = Math.min(44, Math.max(5, p.nm / 22));
+      const nx = -p.dy, ny = p.dx;
+      const path = () => {
+        octx.beginPath();
+        for (let i = 0; i <= 40; i++) {
+          const s = i / 40;
+          const along = -len * s;
+          const w = amp * Math.sin(Math.PI * s) * Math.sin((2 * Math.PI * along) / lam + p.phase);
+          const x = p.x + p.dx * along + nx * w;
+          const y = p.y + p.dy * along + ny * w;
+          if (i === 0) octx.moveTo(x, y);
+          else octx.lineTo(x, y);
+        }
+      };
+      const dim = p.kind === 'through' ? 0.5 : 1;
+      octx.lineCap = 'round';
+      octx.strokeStyle = rgbCss(p.color, 0.22 * dim);
+      octx.lineWidth = 7;
+      path();
+      octx.stroke();
+      octx.strokeStyle = rgbCss(p.color, 0.95 * dim);
+      octx.lineWidth = 1.6;
+      path();
+      octx.stroke();
+      const g = octx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 9);
+      g.addColorStop(0, `rgba(255,255,255,${0.9 * dim})`);
+      g.addColorStop(0.35, rgbCss(p.color, 0.6 * dim));
+      g.addColorStop(1, rgbCss(p.color, 0));
+      octx.fillStyle = g;
+      octx.fillRect(p.x - 9, p.y - 9, 18, 18);
+    }
+
+    // --- Saltos ---
+    function applyJump(o: Orbital) {
+      const dE = energy(cur.n) - energy(o.n);
+      if (dE > 0) {
+        const ln = line(cur.n, o.n);
+        emitPhoton(ln);
+        emitted.set(`${ln.ni}-${ln.nf}`, (emitted.get(`${ln.ni}-${ln.nf}`) ?? 0) + 1);
+        audio.photon(ln.dE, 'emit', panOf(ln.nm));
+        say(`emitido · ${ln.name} · ${fmtNm(ln.nm)} nm · ${cur.n} → ${o.n}`);
+      }
+      const next = cloudOf(o);
+      renderer.setNext(next);
+      cur = o;
+      curCloud = next;
+      mix = 0;
+      morphT = 0;
+      targetScale = fitScale(next);
+      setLife();
+      updateStatus();
+      if (mode === 'play') checkGoal();
+    }
+
+    function setLife() {
+      if (cur.n === 1) {
+        decayAt = Infinity;
+      } else {
+        lifetime = mode === 'play' ? rnd(4.5, 8.5) : rnd(1.6, 4);
+        lifeStart = clock;
+        decayAt = clock + lifetime;
+      }
+      exciteAt = mode === 'watch' && cur.n < MAX_N ? clock + (cur.n === 1 ? rnd(1.5, 4) : rnd(3, 6)) : Infinity;
+    }
+
+    function decay() {
+      if (cur.n === 1) return;
+      const nf = 1 + Math.floor(Math.random() * (cur.n - 1));
+      const path = jumpPath(cur, nf);
+      queue = path.slice(1);
+      applyJump(path[0]);
+    }
+
+    function excite(n: number) {
+      const target = jumpPath(cur, n)[0];
+      incomingPhoton(line(n, cur.n).nm, target);
+      exciteAt = Infinity;
+    }
+
+    function autoExcite() {
+      if (cur.n >= MAX_N) return;
+      let n: number;
+      if (cur.n === 1) {
+        const u = Math.random();
+        n = u < 0.4 ? 2 : u < 0.68 ? 3 : u < 0.82 ? 4 : u < 0.91 ? 5 : 6;
+      } else {
+        n = cur.n + 1 + Math.floor(Math.random() * (MAX_N - cur.n));
+      }
+      excite(n);
+    }
+
+    /** Botón o tecla de nivel (solo en modo contemplar). */
+    function goLevel(n: number) {
+      if (mode === 'play') { say('en el juego solo se sube con luz'); return; }
+      if (n === cur.n || n < 1 || n > MAX_N) return;
+      if (photons.some((p) => p.kind === 'in')) return;
+      queue = [];
+      if (n > cur.n) {
+        excite(n);
+      } else {
+        const path = jumpPath(cur, n);
+        queue = path.slice(1);
+        applyJump(path[0]);
+      }
+    }
+
+    function processTimers() {
+      const incoming = photons.some((p) => p.kind === 'in');
+      if (queue.length) {
+        if (morphT > MORPH_S + 0.45) applyJump(queue.shift()!);
+        return;
+      }
+      if (incoming || morphT < MORPH_S) return;
+      if (clock > decayAt) decay();
+      else if (mode === 'watch' && clock > exciteAt) autoExcite();
+      if (game.nextAt && clock > game.nextAt) {
+        game.nextAt = 0;
+        newTarget();
+      }
+    }
+
+    // --- Juego ---
+    function newTarget() {
+      let pool = [2, 3, 4, 5, 6].filter((n) => n !== cur.n);
+      if (cur.n < MAX_N) pool = pool.filter((n) => n > cur.n);
+      if (game.score === 0) pool = pool.filter((n) => n <= 3);
+      game.target = pool[Math.floor(Math.random() * pool.length)] ?? 2;
+      game.misses = 0;
+      updateGoal();
+    }
+    function checkGoal() {
+      if (cur.n !== game.target || game.nextAt) return;
+      game.score++;
+      toastMsg(`¡nivel ${game.target}!`);
+      audio.win(BALMER.map((l) => l.dE));
+      game.nextAt = clock + 1.8;
+      updateGoal();
+    }
+    function updateGoal() {
+      goal.innerHTML = `objetivo: <b>nivel ${game.target}</b> · logrados: ${game.score}`;
+    }
+    function setMode(m: 'watch' | 'play') {
+      mode = m;
+      const play = m === 'play';
+      modeWatch.setAttribute('aria-pressed', String(!play));
+      modePlay.setAttribute('aria-pressed', String(play));
+      playBtn.setAttribute('aria-pressed', String(play));
+      playBtn.textContent = play ? 'Dejar de jugar (G)' : 'Jugar (G)';
+      goal.hidden = !play;
+      levelsBox.classList.toggle('locked', play);
+      queue = [];
+      if (play) {
+        game.score = 0;
+        game.nextAt = 0;
+        newTarget();
+        if (barCursor < 0) barCursor = barU(486);
+        tipUntil = clock + 4;
+        toastMsg('mandá luz desde el espectro');
+      } else {
+        toastMsg('contemplar');
+      }
+      setLife();
+      updateTip();
+      showHud(4000);
+    }
+
+    // --- Bohr ---
+    function drawBohr() {
+      const cx = W / 2, cy = H / 2;
+      for (let n = 1; n <= MAX_N; n++) {
+        const r = n * n * scale;
+        if (r > Math.max(W, H) * 1.5) break;
+        octx.strokeStyle = `rgba(207,231,242,${n === cur.n ? 0.55 : 0.14})`;
+        octx.lineWidth = n === cur.n ? 1.5 : 1;
+        octx.beginPath();
+        octx.arc(cx, cy, r, 0, Math.PI * 2);
+        octx.stroke();
+      }
+      const r = cur.n * cur.n * scale;
+      const ex = cx + r * Math.cos(bohrAngle), ey = cy + r * Math.sin(bohrAngle);
+      const pal = PALETTES[paletteIndex];
+      const g = octx.createRadialGradient(ex, ey, 0, ex, ey, 16);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.3, rgbCss(pal.pos, 0.7));
+      g.addColorStop(1, rgbCss(pal.pos, 0));
+      octx.fillStyle = g;
+      octx.fillRect(ex - 16, ey - 16, 32, 32);
+      if (morphT < 0.5) {
+        const k = morphT / 0.5;
+        octx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`;
+        octx.lineWidth = 2;
+        octx.beginPath();
+        octx.arc(ex, ey, 10 + 40 * k, 0, Math.PI * 2);
+        octx.stroke();
+      }
+    }
+
+    function drawNucleus() {
+      const cx = W / 2, cy = H / 2;
+      const g = octx.createRadialGradient(cx, cy, 0, cx, cy, 14);
+      g.addColorStop(0, 'rgba(255,240,220,0.95)');
+      g.addColorStop(0.25, 'rgba(255,190,120,0.5)');
+      g.addColorStop(1, 'rgba(255,190,120,0)');
+      octx.fillStyle = g;
+      octx.fillRect(cx - 14, cy - 14, 28, 28);
+    }
+
+    function drawScaleBar() {
+      const options = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5];
+      let nm = options[0];
+      for (const o of options) if ((o / A0_NM) * scale <= 150) nm = o;
+      const px = (nm / A0_NM) * scale;
+      const x1 = W - 24, y = H - 92;
+      octx.strokeStyle = 'rgba(207,231,242,0.7)';
+      octx.lineWidth = 1;
+      octx.beginPath();
+      octx.moveTo(x1 - px, y + 0.5);
+      octx.lineTo(x1, y + 0.5);
+      octx.moveTo(x1 - px + 0.5, y - 4);
+      octx.lineTo(x1 - px + 0.5, y + 5);
+      octx.moveTo(x1 - 0.5, y - 4);
+      octx.lineTo(x1 - 0.5, y + 5);
+      octx.stroke();
+      octx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+      octx.textAlign = 'right';
+      octx.textBaseline = 'bottom';
+      octx.fillStyle = 'rgba(207,231,242,0.7)';
+      octx.fillText(`${fmt(nm, nm < 0.1 ? 2 : 1)} nm`, x1, y - 6);
+      octx.textAlign = 'left';
+    }
+
+    // --- Textos ---
+    function updateStatus() {
+      const r = meanRadius(cur) * A0_NM;
+      status.textContent = `n = ${cur.n} · orbital ${orbitalName(cur)} · ${fmt(energy(cur.n), 2)} eV · radio ≈ ${fmt(r, 2)} nm`;
+      levelBtns.forEach((b, i) => b.setAttribute('aria-current', String(i + 1 === cur.n)));
+    }
+    let captionTimer = 0;
+    function say(text: string) {
+      caption.textContent = text;
+      caption.classList.remove('hidden');
+      clearTimeout(captionTimer);
+      captionTimer = window.setTimeout(() => caption.classList.add('hidden'), 3200);
+    }
+    let toastTimer = 0;
+    function toastMsg(text: string) {
+      toast.textContent = text;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 1800);
+    }
+
+    // --- Bucle ---
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      for (const c of [canvas, overlay]) {
+        c.width = Math.round(W * DPR);
+        c.height = Math.round(H * DPR);
+      }
+      octx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const r = spectrum.getBoundingClientRect();
+      barW = r.width;
+      barH = r.height;
+      bar.width = Math.round(barW * DPR);
+      bar.height = Math.round(barH * DPR);
+      buildBarGradient();
+      layoutLadder();
+      if (curCloud) targetScale = fitScale(curCloud);
+    }
+
+    function update(dt: number) {
+      clock += dt;
+      morphT += dt;
+      mix = ease(Math.min(1, morphT / MORPH_S));
+      scale += (targetScale - scale) * Math.min(1, dt * 2.5);
+      if (!drag.on && !reducedMotion) yaw += dt * 0.12;
+      bohrAngle += (dt * 10) / (cur.n * cur.n);
+      updatePhotons(dt);
+      processTimers();
+    }
+
+    let last = performance.now();
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!paused) update(dt);
+      render(dt);
+      requestAnimationFrame(frame);
+    }
+
+    function render(dt: number) {
+      const pal = PALETTES[paletteIndex];
+      if (bohr) {
+        renderer.clear();
+      } else {
+        renderer.draw({
+          rot: rotation(yaw, pitch),
+          scale: scale * DPR,
+          mix,
+          time: clock,
+          size: 2.8 * DPR * Math.sqrt(20000 / POINTS),
+          alpha: 0.3,
+          pos: pal.pos,
+          neg: pal.neg,
+        });
+      }
+
+      octx.clearRect(0, 0, W, H);
+      if (bohr) drawBohr();
+      drawNucleus();
+      drawLadder(dt);
+      drawScaleBar();
+      for (const p of photons) drawPhoton(p);
+      drawBar();
+      if (barHover < 0 && tipUntil && clock > tipUntil) { tipUntil = 0; updateTip(); }
+    }
+
+    // Diagnóstico desde la consola: estado y __atomo.advance(s) para adelantar la simulación.
+    (window as any).__atomo = {
+      get state() { return { cur, mix, scale, mode, queue: queue.length, photons: photons.length, points: POINTS, decayIn: decayAt - clock, exciteIn: exciteAt - clock }; },
+      go: (n: number) => goLevel(n),
+      fire: (nm: number) => incomingPhoton(nm, null),
+      lines: () => Object.fromEntries(emitted),
+      advance(seconds: number) {
+        for (let t = 0; t < seconds; t += 1 / 60) update(1 / 60);
+        render(1 / 60);
+      },
+    };
+
+    // --- Entrada ---
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      drag.on = true;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      drag.moved = 0;
+      canvas.classList.add('grabbing');
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drag.on) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      yaw += dx * 0.006;
+      pitch = Math.max(-1.4, Math.min(1.4, pitch + dy * 0.006));
+    });
+    const endDrag = () => {
+      if (!drag.on) return;
+      drag.on = false;
+      canvas.classList.remove('grabbing');
+      if (drag.moved < 6) {
+        // Clic seco: perturbar el átomo.
+        if (mode === 'play') { say('mandá luz desde el espectro'); return; }
+        if (queue.length || photons.some((p) => p.kind === 'in')) return;
+        if (cur.n < MAX_N && (cur.n === 1 || Math.random() < 0.5)) autoExcite();
+        else decay();
+      }
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+
+    levelBtns.forEach((b) => b.addEventListener('click', () => goLevel(Number(b.dataset.level))));
+
+    function fire(u: number) {
+      if (photons.some((p) => p.kind === 'in')) return;
+      incomingPhoton(barNm(u), null);
+    }
+    spectrum.addEventListener('pointermove', (e) => {
+      const r = spectrum.getBoundingClientRect();
+      barHover = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      updateTip();
+    });
+    spectrum.addEventListener('pointerleave', () => {
+      barHover = -1;
+      updateTip();
+    });
+    spectrum.addEventListener('pointerdown', (e) => {
+      const r = spectrum.getBoundingClientRect();
+      const u = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      barCursor = u;
+      fire(u);
+      e.preventDefault();
+    });
+
+    modeWatch.addEventListener('click', () => setMode('watch'));
+    modePlay.addEventListener('click', () => setMode('play'));
+    playBtn.addEventListener('click', () => setMode(mode === 'play' ? 'watch' : 'play'));
+
+    function toggleBohr() {
+      bohr = !bohr;
+      bohrBtn.setAttribute('aria-pressed', String(bohr));
+      bohrBtn.textContent = bohr ? 'Volver a la nube (B)' : 'Modelo de Bohr (B)';
+      toastMsg(bohr ? 'modelo de Bohr · 1913' : 'orbitales · 1926');
+    }
+    bohrBtn.addEventListener('click', toggleBohr);
+
+    function setPalette(i: number) {
+      paletteIndex = i % PALETTES.length;
+      paletteName.textContent = '· ' + PALETTES[paletteIndex].name;
+    }
+
+    function reset() {
+      queue = [];
+      photons.length = 0;
+      emitted.clear();
+      flashes.length = 0;
+      cur = { n: 1, l: 0, m: 0 };
+      curCloud = cloudOf(cur);
+      renderer.setClouds(curCloud, curCloud);
+      mix = 1;
+      morphT = MORPH_S;
+      scale = targetScale = fitScale(curCloud);
+      game.score = 0;
+      game.nextAt = 0;
+      if (mode === 'play') newTarget();
+      setLife();
+      updateStatus();
+    }
+
+    window.addEventListener('lab:sound', (e) => audio.setEnabled((e as CustomEvent<boolean>).detail));
+    window.addEventListener('keydown', (e) => {
+      if (ignoreKey(e)) return;
+      const k = e.key.toLowerCase();
+      if (k >= '1' && k <= '6') { goLevel(Number(k)); return; }
+      switch (k) {
+        case 'g': setMode(mode === 'play' ? 'watch' : 'play'); break;
+        case 'b': toggleBohr(); break;
+        case 'c': setPalette(paletteIndex + 1); toastMsg(PALETTES[paletteIndex].name); showHud(2500); break;
+        case 'r': reset(); toastMsg('reinicio'); break;
+        case ' ': paused = !paused; e.preventDefault(); break;
+        case 'arrowleft':
+        case 'arrowright': {
+          if (barCursor < 0) barCursor = barU(486);
+          const step = (e.shiftKey ? 0.02 : 0.004) * (k === 'arrowleft' ? -1 : 1);
+          barCursor = Math.min(1, Math.max(0, barCursor + step));
+          tipUntil = clock + 3;
+          updateTip();
+          e.preventDefault();
+          break;
+        }
+        case 'enter':
+          if (barCursor >= 0) fire(barCursor);
+          break;
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+    setPalette(0);
+    reset();
+    exciteAt = 2;
+    setTimeout(layoutLadder, 300);
+    requestAnimationFrame(frame);
+  </script>
+</Experiment>
