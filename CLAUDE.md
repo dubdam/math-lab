@@ -18,6 +18,11 @@ en el navegador (canvas / WebGL).
   (`scripts/orbit.ts`) dibujada y sonificada (`scripts/mandelbrot-audio.ts`), recuadro
   Julia (J/Enter), viajes a 6 lugares (V, arranca solo tras 25 s sin tocar).
   Límite de zoom ~×26.000 (float32). Diagnóstico: `__mandel.bench(span)` / `jump(span, i)`.
+- `/bandadas` — boids 2.5D en canvas 2D (`scripts/flock.ts`, grilla espacial, tope de 16
+  vecinos). Cursor = halcón, clic asusta, mantener atrae, halcón automático tras 8 s sin
+  mover. Teclas 1/2/3 apagan reglas, E = mirar un pájaro (cámara lenta + fuerzas).
+  "Orden" = alineación local promedio (azar ≈ 0). Parámetros ajustados midiendo grupos y
+  distancia al vecino. Sonido en `scripts/flock-audio.ts`. Diagnóstico: `__bandada.advance(s)`.
 - Plantilla común: `layouts/Experiment.astro` + `scripts/lab-ui.ts` (eventos `lab:sound`,
   `lab:info`, `lab:show-hud`, `lab:fullscreen`; teclas S ? H F Esc). Audio base: `scripts/lab-audio.ts`.
 - No publicado todavía: falta config nginx + DNS para math.adamdub.xyz.

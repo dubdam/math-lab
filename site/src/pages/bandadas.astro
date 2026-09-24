@@ -1,0 +1,533 @@
+---
+// Bandadas inmersivas: cientos de pájaros que siguen tres reglas locales.
+// El cursor es un halcón; se puede apagar cada regla y mirar las fuerzas de un pájaro.
+import Experiment from '../layouts/Experiment.astro';
+
+const rules = [
+  { key: 'separation', name: 'Separación', num: 1, text: 'No acercarse demasiado a los de al lado. Sin ella, se amontonan en un solo punto.' },
+  { key: 'alignment', name: 'Alineación', num: 2, text: 'Ir para el mismo lado que los vecinos. Sin ella, se agrupan pero cada uno vuela para cualquier lado, como un enjambre de mosquitos.' },
+  { key: 'cohesion', name: 'Cohesión', num: 3, text: 'Acercarse al centro de los vecinos. Sin ella, vuelan parejo pero la bandada se deshace en grupitos que se alejan.' },
+];
+---
+
+<Experiment title="Bandadas" description="Cientos de pájaros siguen tres reglas simples y forman una bandada. Tu cursor es el halcón." theme="#1a1f3d">
+  <canvas id="c" class="stage" aria-label="Bandada de pájaros animada e interactiva"></canvas>
+  <p id="toast" class="toast hidden" aria-live="polite"></p>
+  <div class="meter" aria-live="off">
+    <span>orden</span>
+    <div class="bar"><i id="meter-fill"></i></div>
+    <b id="meter-value">0%</b>
+  </div>
+
+  <Fragment slot="help">
+    <p class="title">BANDADAS <span id="palette-name"></span></p>
+    <p>mové el cursor: sos el halcón · clic: asustar · mantené: atraer</p>
+    <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> apagar reglas · <kbd>E</kbd> mirar un pájaro · <kbd>C</kbd> colores · <kbd>T</kbd> estela · <kbd>S</kbd> sonido · <kbd>F</kbd> pantalla completa · <kbd>espacio</kbd> pausa · <kbd>R</kbd> reiniciar · <kbd>?</kbd> qué es esto</p>
+  </Fragment>
+
+  <Fragment slot="info">
+    <h2 id="info-title">Bandadas</h2>
+
+    <p class="lead">
+      Cada pájaro sigue solo tres reglas, mirando a los vecinos que tiene cerca. Nadie dirige
+      la bandada ni conoce su forma. Aun así, la bandada gira, se estira y se abre como un
+      solo animal.
+    </p>
+
+    <h3>Las tres reglas</h3>
+    <p>Apagalas con las teclas 1, 2 y 3, o mové los controles, y mirá qué se rompe.</p>
+    {rules.map((r) => (
+      <div class="rule">
+        <label>
+          <span class="rule-head"><kbd>{r.num}</kbd> {r.name} <b data-val={r.key}>100%</b></span>
+          <input type="range" min="0" max="200" step="5" value="100" data-rule={r.key} />
+        </label>
+        <p>{r.text}</p>
+      </div>
+    ))}
+
+    <button id="focus-btn" class="toggle" type="button" aria-pressed="false">Mirar a un pájaro (E)</button>
+    <p>
+      La animación va en cámara lenta y se marca un pájaro. El círculo es hasta dónde ve, las
+      líneas son los vecinos que tiene en cuenta y las flechas son las tres fuerzas que lo
+      empujan: <span class="c-sep">roja</span> separación, <span class="c-ali">verde</span>
+      alineación y <span class="c-coh">azul</span> cohesión.
+    </p>
+
+    <h3>El orden</h3>
+    <p>
+      El indicador de abajo a la derecha mide cuánto vuela cada pájaro para el mismo lado que
+      sus vecinos: 0% es un caos donde cada uno va adonde quiere; 100%, todos alineados con los
+      de al lado, aunque la bandada entera esté girando en remolino. Ese orden no está
+      programado en ningún lado: aparece solo, a partir de las reglas locales. Por eso se dice
+      que es un comportamiento <em>emergente</em>.
+    </p>
+
+    <h3>El halcón</h3>
+    <p>
+      Tu cursor es un halcón: los pájaros cercanos huyen y aceleran por el miedo. Se cree que
+      las nubes enormes de estorninos, las <em>murmuraciones</em>, son justamente una defensa:
+      en medio de esa masa que cambia de forma, al halcón le cuesta mucho elegir una presa.
+    </p>
+
+    <h3>En la naturaleza</h3>
+    <p>
+      Estorninos, cardúmenes de peces, manadas de ñus. En 2008, un equipo italiano filmó en 3D
+      a los estorninos de Roma y descubrió que cada pájaro no atiende a todos los que tiene
+      cerca, sino a sus 6 o 7 vecinos más próximos, estén a la distancia que estén. Esta
+      simulación usa la versión clásica: un radio de visión.
+    </p>
+
+    <h3>Un poco de historia</h3>
+    <p>
+      Craig Reynolds creó el modelo en 1986 y lo llamó <em>boids</em> (de <em>bird-oid</em>,
+      «parecido a pájaro»). El cine lo adoptó enseguida: los murciélagos y el ejército de
+      pingüinos de <em>Batman vuelve</em> (1992) se animaron con estas reglas. En 1995, Tamás
+      Vicsek mostró con un modelo todavía más simple que el orden aparece de golpe cuando hay
+      suficientes individuos juntos, como el agua cuando se congela.
+    </p>
+  </Fragment>
+
+  <style>
+    #c { cursor: none; }
+    .toast {
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      top: 22%;
+      transform: translateX(-50%);
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .toast.hidden { opacity: 0; }
+    .meter {
+      position: fixed;
+      z-index: 1;
+      right: 20px;
+      bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0.8;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+      pointer-events: none;
+    }
+    .meter .bar {
+      width: 90px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .meter i { display: block; height: 100%; width: 0; background: currentColor; transition: width 0.25s linear; }
+    .meter b { font-weight: 400; min-width: 4ch; text-align: right; }
+    .rule { margin: 14px 0; }
+    .rule label { display: block; cursor: pointer; }
+    .rule-head { display: flex; align-items: center; gap: 8px; color: #fff; }
+    .rule-head b { margin-left: auto; font-weight: 400; opacity: 0.8; }
+    .rule input { width: 100%; margin: 8px 0 0; accent-color: #cfe7f2; }
+    .rule p { margin: 4px 0 0; font-size: 13px; }
+    .c-sep { color: #ff7b7b; }
+    .c-ali { color: #7bffb0; }
+    .c-coh { color: #7bc4ff; }
+  </style>
+
+  <script>
+    import { Flock, type Point, type Rules } from '../scripts/flock';
+    import { FlockAudio } from '../scripts/flock-audio';
+    import { ignoreKey, showHud } from '../scripts/lab-ui';
+
+    type Palette = {
+      name: string;
+      group: string;
+      sky: string[];
+      bird: string;
+      glow: boolean;
+      hawk: string;
+    };
+    const PALETTES: Palette[] = [
+      { name: 'atardecer', group: 'bandada', sky: ['#1a1f3d', '#5b3566', '#c75c78', '#f3a15c'], bird: '10,10,22', glow: false, hawk: '#050508' },
+      { name: 'noche', group: 'bandada', sky: ['#01020a', '#040a1e', '#0a1834', '#10213f'], bird: '215,232,255', glow: true, hawk: '#ffd9a0' },
+      { name: 'cardumen', group: 'cardumen', sky: ['#01212a', '#01323d', '#02434f', '#035260'], bird: '185,238,236', glow: true, hawk: '#ff9d7a' },
+    ];
+
+    const RULE_NAMES: Record<keyof Rules, string> = { separation: 'separación', alignment: 'alineación', cohesion: 'cohesión' };
+    const COLORS = { sep: '#ff7b7b', ali: '#7bffb0', coh: '#7bc4ff' };
+
+    const canvas = document.getElementById('c') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const toast = document.getElementById('toast')!;
+    const meterFill = document.getElementById('meter-fill')!;
+    const meterValue = document.getElementById('meter-value')!;
+    const paletteName = document.getElementById('palette-name')!;
+    const focusBtn = document.getElementById('focus-btn') as HTMLButtonElement;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const flock = new Flock(1600);
+    const audio = new FlockAudio();
+    const rules: Rules = { separation: 1, alignment: 1, cohesion: 1 };
+
+    let W = 0, H = 0, DPR = 1;
+    let sky: CanvasGradient;
+    let paletteIndex = 0;
+    let paused = false;
+    let trails = false;
+    let clock = 0;
+    let focus = -1;
+
+    const pointer = { x: 0, y: 0, active: false, down: false, downAt: 0, downX: 0, downY: 0, lastMove: -99 };
+    const hawk = { x: 0, y: 0, hx: 1, hy: 0, active: false, phase: 0 };
+    // Pasada automática del halcón cuando nadie toca nada.
+    let pass: { t: number; dur: number; p0: Point; p1: Point; p2: Point } | null = null;
+    let lastPass = 0;
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      flock.resize(W, H);
+      const target = Math.round(Math.min(1400, Math.max(300, (W * H) / 1800)));
+      if (flock.n === 0 || flock.n > target) flock.setCount(target);
+      buildSky();
+    }
+
+    function buildSky() {
+      const p = PALETTES[paletteIndex];
+      sky = ctx.createLinearGradient(0, 0, 0, H);
+      p.sky.forEach((c, i) => sky.addColorStop(i / (p.sky.length - 1), c));
+      document.body.style.background = p.sky[0];
+    }
+
+    function reset() {
+      flock.n = 0;
+      focus = -1;
+      resize();
+    }
+
+    let toastTimer = 0;
+    function say(text: string) {
+      toast.textContent = text;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 1600);
+    }
+
+    // --- Halcón ---
+    function updateHawk(dt: number) {
+      const holding = pointer.down && clock - pointer.downAt > 0.2;
+      let tx = hawk.x, ty = hawk.y;
+      if (pointer.active && !holding) {
+        pass = null;
+        tx = pointer.x;
+        ty = pointer.y;
+        hawk.active = true;
+      } else if (pass) {
+        pass.t += dt;
+        const s = Math.min(1, pass.t / pass.dur);
+        const u = 1 - s;
+        tx = u * u * pass.p0.x + 2 * u * s * pass.p1.x + s * s * pass.p2.x;
+        ty = u * u * pass.p0.y + 2 * u * s * pass.p1.y + s * s * pass.p2.y;
+        hawk.x = tx;
+        hawk.y = ty;
+        hawk.active = true;
+        if (s >= 1) { pass = null; hawk.active = false; }
+      } else {
+        hawk.active = false;
+        if (!reducedMotion && clock - pointer.lastMove > 8 && clock - lastPass > 16) startPass();
+      }
+      const px = hawk.x, py = hawk.y;
+      if (!pass) {
+        const k = Math.min(1, dt * 9);
+        hawk.x += (tx - hawk.x) * k;
+        hawk.y += (ty - hawk.y) * k;
+      }
+      const mx = hawk.x - px, my = hawk.y - py;
+      const m = Math.hypot(mx, my);
+      if (m > 0.5) {
+        hawk.hx += (mx / m - hawk.hx) * Math.min(1, dt * 8);
+        hawk.hy += (my / m - hawk.hy) * Math.min(1, dt * 8);
+      }
+      hawk.phase += dt * 5;
+    }
+
+    function startPass() {
+      const fromLeft = Math.random() < 0.5;
+      const y0 = H * (0.2 + Math.random() * 0.6);
+      const y2 = H * (0.2 + Math.random() * 0.6);
+      pass = {
+        t: 0,
+        dur: 3.5,
+        p0: { x: fromLeft ? -80 : W + 80, y: y0 },
+        p1: { x: flock.center.x, y: flock.center.y },
+        p2: { x: fromLeft ? W + 80 : -80, y: y2 },
+      };
+      hawk.x = pass.p0.x;
+      hawk.y = pass.p0.y;
+      lastPass = clock;
+      audio.cry(fromLeft ? 0.1 : 0.9);
+    }
+
+    // --- Dibujo ---
+    function drawBird(x: number, y: number, hx: number, hy: number, s: number, flap: number) {
+      const w = s * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(flap)));
+      const px = -hy, py = hx;
+      ctx.moveTo(x + hx * s, y + hy * s);
+      ctx.lineTo(x - hx * s * 0.5 + px * w * 1.3, y - hy * s * 0.5 + py * w * 1.3);
+      ctx.lineTo(x - hx * s * 0.2, y - hy * s * 0.2);
+      ctx.lineTo(x - hx * s * 0.5 - px * w * 1.3, y - hy * s * 0.5 - py * w * 1.3);
+      ctx.closePath();
+    }
+
+    function render() {
+      const p = PALETTES[paletteIndex];
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = trails ? 0.22 : 1;
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+
+      // Tres capas de profundidad: lejos (chicos y tenues) → cerca (grandes y nítidos).
+      const D = flock.depth;
+      const layers = [
+        { min: D * 0.66, max: Infinity, alpha: 0.35 },
+        { min: D * 0.33, max: D * 0.66, alpha: 0.6 },
+        { min: -Infinity, max: D * 0.33, alpha: 0.95 },
+      ];
+      if (p.glow) ctx.globalCompositeOperation = 'lighter';
+      for (const layer of layers) {
+        ctx.beginPath();
+        for (let i = 0; i < flock.n; i++) {
+          const z = flock.z[i];
+          if (z < layer.min || z >= layer.max) continue;
+          const vx = flock.vx[i], vy = flock.vy[i];
+          const h = Math.hypot(vx, vy) || 1;
+          const s = 3 + 4 * (1 - Math.min(1, Math.max(0, z / D)));
+          drawBird(flock.x[i], flock.y[i], vx / h, vy / h, s, flock.phase[i]);
+        }
+        ctx.fillStyle = `rgba(${p.bird},${p.glow ? layer.alpha * 0.8 : layer.alpha})`;
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+
+      const holding = pointer.down && clock - pointer.downAt > 0.2;
+      if (holding) {
+        const g = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 60);
+        g.addColorStop(0, 'rgba(255,255,255,0.35)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(pointer.x - 60, pointer.y - 60, 120, 120);
+      }
+
+      if (hawk.active) {
+        const h = Math.hypot(hawk.hx, hawk.hy) || 1;
+        ctx.beginPath();
+        drawBird(hawk.x, hawk.y, hawk.hx / h, hawk.hy / h, 15, hawk.phase);
+        ctx.fillStyle = p.hawk;
+        ctx.fill();
+      }
+
+      if (focus >= 0) drawFocus();
+    }
+
+    function arrow(x: number, y: number, fx: number, fy: number, color: string, label: string) {
+      const len = Math.hypot(fx, fy);
+      if (len < 1) return;
+      const scale = 70 / flock.maxForce;
+      const ex = x + fx * scale, ey = y + fy * scale;
+      const ux = fx / len, uy = fy / len;
+      ctx.strokeStyle = ctx.fillStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - ux * 8 - uy * 4, ey - uy * 8 + ux * 4);
+      ctx.lineTo(ex - ux * 8 + uy * 4, ey - uy * 8 - ux * 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(label, ex + ux * 8, ey + uy * 8);
+    }
+
+    function drawFocus() {
+      if (focus >= flock.n) focus = 0;
+      const i = focus;
+      const x = flock.x[i], y = flock.y[i];
+      const f = flock.forcesOf(i);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.setLineDash([4, 5]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, flock.perception, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      for (const j of f.neighbors) {
+        ctx.moveTo(x, y);
+        ctx.lineTo(flock.x[j], flock.y[j]);
+      }
+      ctx.stroke();
+
+      ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+      ctx.textBaseline = 'middle';
+      arrow(x, y, f.sep.x * rules.separation, f.sep.y * rules.separation, COLORS.sep, 'separación');
+      arrow(x, y, f.ali.x * rules.alignment, f.ali.y * rules.alignment, COLORS.ali, 'alineación');
+      arrow(x, y, f.coh.x * rules.cohesion, f.coh.y * rules.cohesion, COLORS.coh, 'cohesión');
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+
+    // --- Bucle ---
+    let last = performance.now();
+    let workEma = 0;
+    let slowFrames = 0;
+    let meterAt = 0;
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!paused) {
+        const t0 = performance.now();
+        const sim = dt * (focus >= 0 ? 0.3 : 1) * (reducedMotion ? 0.5 : 1);
+        clock += dt;
+        updateHawk(dt);
+        const holding = pointer.down && clock - pointer.downAt > 0.2;
+        flock.step(sim, rules, hawk.active ? hawk : null, holding ? pointer : null);
+        render();
+
+        // Si no da abasto, menos pájaros (hasta 250).
+        workEma += (performance.now() - t0 - workEma) * 0.1;
+        slowFrames = workEma > 11 ? slowFrames + 1 : 0;
+        if (slowFrames > 45 && flock.n > 250) {
+          flock.setCount(Math.max(250, Math.round(flock.n * 0.85)));
+          slowFrames = 0;
+        }
+
+        if (clock - meterAt > 0.25) {
+          meterAt = clock;
+          const pct = Math.round(flock.order * 100);
+          meterFill.style.width = pct + '%';
+          meterValue.textContent = pct + '%';
+        }
+        audio.update(flock.order, flock.speed, flock.center.x / W);
+      }
+      requestAnimationFrame(frame);
+    }
+    // Diagnóstico desde la consola: estado y __bandada.advance(s) para adelantar la simulación.
+    (window as any).__bandada = {
+      get n() { return flock.n; },
+      get workMs() { return workEma; },
+      get order() { return flock.order; },
+      advance(seconds: number) {
+        for (let t = 0; t < seconds; t += 1 / 60) flock.step(1 / 60, rules, null, null);
+        render();
+      },
+      focus: () => toggleFocus(),
+    };
+
+    // --- Controles ---
+    const sliders = document.querySelectorAll<HTMLInputElement>('input[data-rule]');
+    function setRule(key: keyof Rules, value: number, announce = false) {
+      rules[key] = value;
+      const pct = Math.round(value * 100);
+      document.querySelector(`b[data-val="${key}"]`)!.textContent = pct + '%';
+      const slider = document.querySelector<HTMLInputElement>(`input[data-rule="${key}"]`)!;
+      slider.value = String(pct);
+      if (announce) say(`${RULE_NAMES[key]}: ${value === 0 ? 'apagada' : 'prendida'}`);
+    }
+    sliders.forEach((s) => s.addEventListener('input', () => setRule(s.dataset.rule as keyof Rules, Number(s.value) / 100)));
+    function toggleRule(key: keyof Rules) {
+      setRule(key, rules[key] === 0 ? 1 : 0, true);
+    }
+
+    function toggleFocus() {
+      if (focus >= 0) {
+        focus = -1;
+      } else {
+        focus = pointer.active ? flock.nearest(pointer.x, pointer.y) : flock.nearest(W / 2, H / 2);
+        say('cámara lenta · un pájaro');
+      }
+      focusBtn.setAttribute('aria-pressed', String(focus >= 0));
+      focusBtn.textContent = focus >= 0 ? 'Dejar de mirar (E)' : 'Mirar a un pájaro (E)';
+    }
+    focusBtn.addEventListener('click', toggleFocus);
+
+    function setPalette(i: number) {
+      paletteIndex = i % PALETTES.length;
+      paletteName.textContent = '· ' + PALETTES[paletteIndex].name;
+      buildSky();
+      audio.setPalette(paletteIndex);
+    }
+
+    window.addEventListener('lab:sound', (e) => audio.setEnabled((e as CustomEvent<boolean>).detail));
+
+    canvas.addEventListener('pointermove', (e) => {
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.active = true;
+      pointer.lastMove = clock;
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      pointer.x = pointer.downX = e.clientX;
+      pointer.y = pointer.downY = e.clientY;
+      pointer.active = true;
+      pointer.down = true;
+      pointer.downAt = clock;
+      pointer.lastMove = clock;
+      if (e.pointerType !== 'mouse') {
+        hawk.x = e.clientX;
+        hawk.y = e.clientY;
+      }
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      const quick = clock - pointer.downAt < 0.2;
+      const still = Math.hypot(e.clientX - pointer.downX, e.clientY - pointer.downY) < 8;
+      if (quick && still) {
+        flock.scare(e.clientX, e.clientY);
+        audio.flutter(e.clientX / W);
+      }
+      pointer.down = false;
+      if (e.pointerType !== 'mouse') pointer.active = false;
+    });
+    canvas.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'mouse') pointer.active = false;
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (ignoreKey(e) || e.target instanceof HTMLInputElement) return;
+      switch (e.key.toLowerCase()) {
+        case '1': toggleRule('separation'); break;
+        case '2': toggleRule('alignment'); break;
+        case '3': toggleRule('cohesion'); break;
+        case 'e': toggleFocus(); break;
+        case 'c': setPalette(paletteIndex + 1); say(PALETTES[paletteIndex].group === 'cardumen' ? 'cardumen' : PALETTES[paletteIndex].name); showHud(2500); break;
+        case 't': trails = !trails; break;
+        case 'r': reset(); break;
+        case ' ': paused = !paused; e.preventDefault(); break;
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+    setPalette(0);
+    requestAnimationFrame(frame);
+  </script>
+</Experiment>

@@ -73,6 +73,15 @@ export class LabAudio {
     return this.enabled && this.ac !== null;
   }
 
+  /** Ruido blanco (mono) para vientos, soplidos y aleteos. */
+  protected noiseBuffer(seconds: number) {
+    const ac = this.ac!;
+    const buf = ac.createBuffer(1, Math.round(ac.sampleRate * seconds), ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
   /** Nota suelta con ataque corto y caída exponencial. */
   protected tone(freq: number, o: ToneOptions = {}) {
     const ac = this.ac!;
