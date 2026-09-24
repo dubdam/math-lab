@@ -1,0 +1,624 @@
+---
+// Voronoi inmersivo: pantalla completa, semillas a la deriva en un campo de flujo,
+// el cursor es una celda más que deforma a las vecinas.
+---
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Voronoi · math.adamdub.xyz</title>
+  <meta name="description" content="Celdas de Voronoi a pantalla completa que reaccionan al cursor." />
+  <meta name="theme-color" content="#03060c" />
+</head>
+<body>
+  <canvas id="c" aria-label="Diagrama de Voronoi animado e interactivo"></canvas>
+
+  <a class="hud back" href="/">← lab</a>
+  <div class="hud help" id="help">
+    <p class="title">VORONOI <span id="palette-name"></span></p>
+    <p>mové el cursor · clic: sembrar · mantené: remolino</p>
+    <p><kbd>C</kbd> colores · <kbd>S</kbd> sonido · <kbd>D</kbd> triangulación · <kbd>T</kbd> estela · <kbd>F</kbd> pantalla completa · <kbd>espacio</kbd> pausa · <kbd>R</kbd> reiniciar · <kbd>?</kbd> qué es esto</p>
+  </div>
+
+  <div class="controls">
+    <button id="sound-btn" type="button" aria-pressed="false" title="Sonido (S)">sonido: no</button>
+    <button id="info-btn" type="button" aria-expanded="false" aria-controls="info" title="Qué es esto (?)">?</button>
+  </div>
+
+  <aside id="info" class="info" hidden aria-labelledby="info-title">
+    <button id="info-close" class="close" type="button" aria-label="Cerrar">×</button>
+    <h2 id="info-title">Diagrama de Voronoi</h2>
+
+    <p class="lead">
+      Cada puntito de la pantalla es una <em>semilla</em>. La celda de una semilla es
+      todo el territorio que queda más cerca de ella que de cualquier otra.
+      Nada más que eso. Con esa regla sola aparece todo el mosaico.
+    </p>
+    <p class="formula">celda(p) = &#123; x : dist(x, p) ≤ dist(x, q) para toda otra semilla q &#125;</p>
+
+    <h3>Las fronteras</h3>
+    <p>
+      Un borde entre dos celdas es la línea de los lugares que están <em>a la misma distancia</em>
+      de las dos semillas: un tramo de la mediatriz del segmento que las une.
+      Por eso los bordes siempre son rectos.
+    </p>
+    <p>
+      Donde se juntan tres celdas hay un punto que está a igual distancia de tres semillas.
+      Es el centro de un círculo que pasa por las tres y no encierra a ninguna otra.
+    </p>
+
+    <h3>La otra cara: Delaunay</h3>
+    <p>
+      Si unís con una línea cada par de semillas vecinas, obtenés una red de triángulos:
+      la <em>triangulación de Delaunay</em>. Es el mismo diagrama visto desde el otro lado:
+      cada borde de Voronoi cruza en ángulo recto a una línea de Delaunay.
+    </p>
+    <button id="delaunay-btn" class="toggle" type="button" aria-pressed="false">Mostrar triangulación (D)</button>
+
+    <h3>Lo que pasa en pantalla</h3>
+    <ul>
+      <li>Tu cursor es una semilla más: la celda oscura. Por eso las vecinas se deforman cuando lo movés.</li>
+      <li>Las celdas chicas brillan más: marcan dónde las semillas están apretadas.</li>
+      <li>Al hacer clic sembrás semillas nuevas y el territorio se reparte de nuevo al instante.</li>
+      <li>Con el sonido activado, cada vez que el cursor entra a otra celda suena una nota.</li>
+    </ul>
+
+    <h3>Dónde aparece</h3>
+    <p>
+      En el pelaje de la jirafa, las alas de la libélula, el barro que se agrieta al secarse
+      y la espuma. Cada vez que algo crece desde varios centros al mismo ritmo
+      hasta chocar con sus vecinos, dibuja un Voronoi.
+    </p>
+    <p>
+      También sirve para responder «¿cuál es el más cercano?»: qué hospital, qué antena
+      o qué estación de lluvia cubre cada zona. En 1854, John Snow marcó en un mapa de Londres
+      qué casas tenían más cerca la bomba de agua de Broad Street y así encontró
+      el origen de una epidemia de cólera.
+    </p>
+
+    <h3>Un poco de historia</h3>
+    <p>
+      Descartes ya dibujó algo parecido en 1644. Dirichlet lo estudió en 1850 y
+      el matemático ucraniano Georgy Voronoi lo generalizó en 1908; el nombre quedó por él.
+      El meteorólogo Alfred Thiessen lo reinventó en 1911 para promediar lluvias,
+      y por eso en geografía también se les dice <em>polígonos de Thiessen</em>.
+    </p>
+
+    <h3>Cómo se calcula acá</h3>
+    <p>
+      Primero se arma la triangulación de Delaunay y de ahí se deducen las celdas.
+      Se rehace todo desde cero unas 60 veces por segundo, con cientos de semillas,
+      usando la librería <a href="https://github.com/d3/d3-delaunay" target="_blank" rel="noopener">d3-delaunay</a>.
+    </p>
+  </aside>
+
+  <style is:global>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #03060c;
+      color: #cfe7f2;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    #c {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+      cursor: none;
+    }
+    .hud {
+      position: fixed;
+      z-index: 1;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      transition: opacity 1.2s ease;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+    .hud.hidden { opacity: 0; pointer-events: none; }
+    .back {
+      top: 18px;
+      left: 20px;
+      color: inherit;
+      text-decoration: none;
+      opacity: 0.7;
+    }
+    .back:hover, .back:focus-visible { opacity: 1; }
+    .help {
+      left: 20px;
+      bottom: 18px;
+      max-width: calc(100vw - 40px);
+      pointer-events: none;
+    }
+    .help p { margin: 4px 0; opacity: 0.75; }
+    .help .title { opacity: 1; font-weight: 700; letter-spacing: 0.3em; }
+    .help .title span { font-weight: 400; letter-spacing: 0.1em; opacity: 0.6; }
+    .controls {
+      position: fixed;
+      z-index: 2;
+      top: 14px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .controls button, .info .toggle, .info .close {
+      font: inherit;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: inherit;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(207, 231, 242, 0.35);
+      border-radius: 999px;
+      min-height: 36px;
+      min-width: 36px;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: opacity 0.3s, border-color 0.3s;
+    }
+    .controls button { opacity: 0.55; }
+    .controls button:hover, .controls button:focus-visible,
+    .controls button[aria-pressed="true"], .controls button[aria-expanded="true"] {
+      opacity: 1;
+      border-color: rgba(207, 231, 242, 0.8);
+    }
+    #info-btn { padding: 0; font-size: 15px; font-weight: 700; }
+    button:focus-visible { outline: 2px solid #cfe7f2; outline-offset: 2px; }
+
+    .info {
+      position: fixed;
+      z-index: 3;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(440px, 100vw);
+      box-sizing: border-box;
+      padding: 64px 28px 40px;
+      overflow-y: auto;
+      background: rgba(3, 6, 12, 0.82);
+      backdrop-filter: blur(14px);
+      border-left: 1px solid rgba(207, 231, 242, 0.15);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .info[hidden] { display: none; }
+    .info h2 { font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; margin: 0 0 16px; }
+    .info h3 { font-size: 13px; letter-spacing: 0.12em; margin: 28px 0 6px; color: #fff; }
+    .info p, .info li { color: rgba(207, 231, 242, 0.85); }
+    .info .lead { font-size: 15px; color: #e8f6fb; }
+    .info em { font-style: normal; color: #fff; border-bottom: 1px solid rgba(207, 231, 242, 0.4); }
+    .info .formula {
+      font-size: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(207, 231, 242, 0.2);
+      border-radius: 6px;
+    }
+    .info ul { padding-left: 18px; }
+    .info a { color: inherit; }
+    .info .toggle { margin-top: 4px; }
+    .info .toggle[aria-pressed="true"] { border-color: #cfe7f2; background: rgba(207, 231, 242, 0.15); }
+    .info .close { position: absolute; top: 14px; right: 16px; padding: 0; font-size: 18px; }
+    kbd {
+      font-family: inherit;
+      border: 1px solid currentColor;
+      border-radius: 3px;
+      padding: 0 4px;
+      opacity: 0.9;
+    }
+  </style>
+
+  <script>
+    import { Delaunay } from 'd3-delaunay';
+    import { VoronoiAudio } from '../scripts/voronoi-audio';
+
+    type Seed = { x: number; y: number; vx: number; vy: number; k: number; extra: boolean };
+    type Palette = {
+      name: string;
+      bg: string;
+      hue: (k: number) => number;
+      sat: number;
+      light: number;
+      edge: string;
+      mode: 'glow' | 'lead';
+    };
+
+    const PALETTES: Palette[] = [
+      { name: 'abisal', bg: '#03060c', hue: (k) => 190 + k * 70, sat: 70, light: 18, edge: '170,235,255', mode: 'glow' },
+      { name: 'magma', bg: '#0b0303', hue: (k) => 345 + k * 55, sat: 85, light: 20, edge: '255,190,120', mode: 'glow' },
+      { name: 'aurora', bg: '#02080a', hue: (k) => 110 + k * 170, sat: 65, light: 17, edge: '200,255,225', mode: 'glow' },
+      { name: 'vitral', bg: '#060606', hue: (k) => k * 360, sat: 78, light: 34, edge: '255,255,255', mode: 'lead' },
+    ];
+
+    const canvas = document.getElementById('c') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const help = document.getElementById('help')!;
+    const back = document.querySelector('.back') as HTMLElement;
+    const paletteName = document.getElementById('palette-name')!;
+
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const SPEED = reducedMotion ? 0.3 : 1;
+
+    let W = 0, H = 0, DPR = 1;
+    let baseCount = 0, maxCount = 0;
+    let seeds: Seed[] = [];
+    let vignette: CanvasGradient;
+    let paletteIndex = 0;
+    let paused = false;
+    let trails = false;
+    let showDelaunay = false;
+    // Semilla más cercana al cursor: cuando cambia, suena una nota.
+    let hoverSeed: Seed | null = null;
+
+    const audio = new VoronoiAudio();
+    const pointer = { x: 0, y: 0, active: false, down: false, downAt: 0, downX: 0, downY: 0, speed: 0 };
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+      vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.hypot(W, H) * 0.6);
+      vignette.addColorStop(0, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, 'rgba(0,0,0,0.65)');
+
+      baseCount = Math.round(Math.min(260, Math.max(60, (W * H) / 9000)));
+      maxCount = baseCount * 2;
+      const base = seeds.filter((s) => !s.extra);
+      while (base.length < baseCount) base.push(makeSeed(Math.random() * W, Math.random() * H, false));
+      seeds = base.slice(0, baseCount).concat(seeds.filter((s) => s.extra));
+    }
+
+    function makeSeed(x: number, y: number, extra: boolean, vx = 0, vy = 0): Seed {
+      return { x, y, vx, vy, k: Math.random(), extra };
+    }
+
+    function reset() {
+      seeds = [];
+      resize();
+    }
+
+    // Campo de flujo barato: suma de senos, suficiente para una deriva orgánica.
+    function flowAngle(x: number, y: number, t: number) {
+      return (
+        (Math.sin(x * 0.0021 + t * 0.13) +
+          Math.cos(y * 0.0017 - t * 0.11) +
+          Math.sin((x + y) * 0.0009 + t * 0.07)) *
+        Math.PI * 0.7
+      );
+    }
+
+    function burst(x: number, y: number) {
+      for (let i = 0; i < 14; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const v = 160 + Math.random() * 120;
+        seeds.push(makeSeed(x + Math.cos(a) * 2, y + Math.sin(a) * 2, true, Math.cos(a) * v, Math.sin(a) * v));
+      }
+      audio.chime(x / W);
+      let excess = seeds.length - maxCount;
+      for (let i = 0; i < seeds.length && excess > 0; ) {
+        if (seeds[i].extra) { seeds.splice(i, 1); excess--; } else i++;
+      }
+    }
+
+    function update(dt: number, t: number) {
+      const R = Math.max(160, Math.min(W, H) * 0.22);
+      const holding = pointer.down && t - pointer.downAt > 0.18;
+      const flowSpeed = 18 * SPEED;
+      const ease = Math.min(1, dt * 1.2);
+
+      for (const s of seeds) {
+        const a = flowAngle(s.x, s.y, t * SPEED);
+        s.vx += (Math.cos(a) * flowSpeed - s.vx) * ease;
+        s.vy += (Math.sin(a) * flowSpeed - s.vy) * ease;
+
+        if (pointer.active) {
+          const dx = s.x - pointer.x;
+          const dy = s.y - pointer.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < R) {
+            const f = (1 - d / R) ** 2;
+            if (holding) {
+              // Remolino: giro tangencial más atracción suave hacia el centro.
+              const pull = d > 24 ? 380 : 0;
+              s.vx += ((-dy / d) * 620 - (dx / d) * pull) * f * dt;
+              s.vy += ((dx / d) * 620 - (dy / d) * pull) * f * dt;
+            } else {
+              s.vx += (dx / d) * 420 * f * dt;
+              s.vy += (dy / d) * 420 * f * dt;
+            }
+          }
+        }
+
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+
+        // Borde blando: las semillas que salen vuelven empujadas, sin saltos.
+        const m = 30;
+        if (s.x < -m) s.vx += 60 * dt * 10;
+        if (s.x > W + m) s.vx -= 60 * dt * 10;
+        if (s.y < -m) s.vy += 60 * dt * 10;
+        if (s.y > H + m) s.vy -= 60 * dt * 10;
+      }
+    }
+
+    function render(t: number) {
+      const p = PALETTES[paletteIndex];
+      const n = seeds.length;
+      const withPointer = pointer.active;
+      const coords = new Float64Array((n + (withPointer ? 1 : 0)) * 2);
+      for (let i = 0; i < n; i++) {
+        coords[i * 2] = seeds[i].x;
+        coords[i * 2 + 1] = seeds[i].y;
+      }
+      if (withPointer) {
+        coords[n * 2] = pointer.x;
+        coords[n * 2 + 1] = pointer.y;
+      }
+
+      const delaunay = new Delaunay(coords);
+      const voronoi = delaunay.voronoi([-40, -40, W + 40, H + 40]);
+      const avgArea = (W * H) / Math.max(1, n);
+      const glowR = Math.max(140, Math.min(W, H) * 0.2);
+
+      if (!trails) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = p.bg;
+        ctx.fillRect(0, 0, W, H);
+      }
+      ctx.globalAlpha = trails ? 0.14 : 1;
+
+      for (let i = 0; i < n; i++) {
+        const poly = voronoi.cellPolygon(i);
+        if (!poly) continue;
+        const s = seeds[i];
+
+        let area = 0;
+        for (let j = 0, m = poly.length - 1; j < m; j++) {
+          area += poly[j][0] * poly[j + 1][1] - poly[j + 1][0] * poly[j][1];
+        }
+        area = Math.abs(area) / 2;
+
+        // Celdas chicas brillan más; cerca del cursor, más todavía.
+        const small = 1 - Math.min(area / avgArea, 2) / 2;
+        let near = 0;
+        if (withPointer) {
+          const d = Math.hypot(s.x - pointer.x, s.y - pointer.y);
+          near = Math.exp(-(d * d) / (2 * glowR * glowR));
+        }
+        const h = p.hue(s.k) + Math.sin(t * 0.1 + s.k * 6.283) * 12;
+        const l = p.light + small * 16 + near * 18;
+
+        const r = Math.sqrt(area) * 0.9 + 1;
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+        g.addColorStop(0, `hsl(${h} ${p.sat}% ${Math.min(80, l + 16)}%)`);
+        g.addColorStop(1, `hsl(${h + 14} ${p.sat}% ${Math.max(3, l - 10)}%)`);
+
+        ctx.beginPath();
+        voronoi.renderCell(i, ctx);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+
+      // La celda del cursor es un hueco: una lente oscura entre las demás.
+      if (withPointer) {
+        let nearest: Seed | null = null;
+        let best = Infinity;
+        for (const j of delaunay.neighbors(n)) {
+          const d = (seeds[j].x - pointer.x) ** 2 + (seeds[j].y - pointer.y) ** 2;
+          if (d < best) { best = d; nearest = seeds[j]; }
+        }
+        if (nearest && nearest !== hoverSeed) {
+          hoverSeed = nearest;
+          audio.pluck(nearest.k, pointer.x / W, pointer.y / H, Math.min(1, 0.35 + pointer.speed / 1500));
+        }
+
+        ctx.beginPath();
+        voronoi.renderCell(n, ctx);
+        ctx.fillStyle = p.bg;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.beginPath();
+      voronoi.render(ctx);
+      if (p.mode === 'glow') {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(${p.edge},0.07)`;
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(${p.edge},0.45)`;
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+
+        ctx.fillStyle = `rgba(${p.edge},0.55)`;
+        for (const s of seeds) {
+          ctx.fillRect(s.x - 1, s.y - 1, 2, 2);
+        }
+      } else {
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(8,8,10,0.95)';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      if (showDelaunay) {
+        ctx.beginPath();
+        delaunay.render(ctx);
+        ctx.strokeStyle = p.mode === 'glow' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (withPointer) {
+        ctx.beginPath();
+        voronoi.renderCell(n, ctx);
+        ctx.strokeStyle = `rgba(${p.edge},${p.mode === 'glow' ? 0.9 : 0.35})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Si el equipo no da abasto, se quitan semillas hasta volver a ~60 fps.
+    const stats = { workMs: 0, seeds: 0 };
+    (window as any).__voronoi = stats;
+    let slowFrames = 0;
+    function adaptQuality(ms: number) {
+      stats.workMs += (ms - stats.workMs) * 0.1;
+      stats.seeds = seeds.length;
+      slowFrames = stats.workMs > 12 ? slowFrames + 1 : 0;
+      if (slowFrames > 45 && baseCount > 60) {
+        baseCount = Math.max(60, Math.round(baseCount * 0.85));
+        maxCount = baseCount * 2;
+        let drop = seeds.filter((s) => !s.extra).length - baseCount;
+        seeds = seeds.filter((s) => s.extra || drop-- <= 0);
+        slowFrames = 0;
+      }
+    }
+
+    let last = performance.now();
+    let clock = 0;
+    let swirl = 0;
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!paused) {
+        clock += dt;
+        const t0 = performance.now();
+        update(dt, clock);
+        render(clock);
+        adaptQuality(performance.now() - t0);
+
+        const holding = pointer.down && clock - pointer.downAt > 0.18;
+        swirl += ((holding ? 1 : 0) - swirl) * Math.min(1, dt * 3);
+        audio.update(pointer.x / W, pointer.y / H, swirl);
+        pointer.speed *= 0.9;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // --- Ayuda en pantalla: se desvanece sola para no romper la inmersión ---
+    let hudTimer = 0;
+    function showHud(ms = 5000) {
+      help.classList.remove('hidden');
+      back.classList.remove('hidden');
+      clearTimeout(hudTimer);
+      hudTimer = window.setTimeout(() => {
+        help.classList.add('hidden');
+        back.classList.add('hidden');
+      }, ms);
+    }
+    function setPalette(i: number) {
+      paletteIndex = i % PALETTES.length;
+      paletteName.textContent = '· ' + PALETTES[paletteIndex].name;
+      document.body.style.background = PALETTES[paletteIndex].bg;
+      audio.setPalette(paletteIndex);
+    }
+
+    // --- Sonido, explicación y triangulación ---
+    const soundBtn = document.getElementById('sound-btn') as HTMLButtonElement;
+    const infoBtn = document.getElementById('info-btn') as HTMLButtonElement;
+    const info = document.getElementById('info')!;
+    const infoClose = document.getElementById('info-close') as HTMLButtonElement;
+    const delaunayBtn = document.getElementById('delaunay-btn') as HTMLButtonElement;
+
+    function toggleSound() {
+      const on = !audio.enabled;
+      audio.setEnabled(on);
+      soundBtn.setAttribute('aria-pressed', String(on));
+      soundBtn.textContent = on ? 'sonido: sí' : 'sonido: no';
+    }
+    function setInfo(open: boolean) {
+      info.hidden = !open;
+      infoBtn.setAttribute('aria-expanded', String(open));
+      if (open) infoClose.focus();
+      else infoBtn.focus();
+    }
+    function toggleDelaunay() {
+      showDelaunay = !showDelaunay;
+      delaunayBtn.setAttribute('aria-pressed', String(showDelaunay));
+      delaunayBtn.textContent = showDelaunay ? 'Ocultar triangulación (D)' : 'Mostrar triangulación (D)';
+    }
+    soundBtn.addEventListener('click', toggleSound);
+    infoBtn.addEventListener('click', () => setInfo(info.hidden));
+    infoClose.addEventListener('click', () => setInfo(false));
+    delaunayBtn.addEventListener('click', toggleDelaunay);
+
+    // --- Entrada ---
+    canvas.addEventListener('pointermove', (e) => {
+      if (pointer.active) {
+        // px/s aproximado, suavizado: define qué tan fuerte suena cada nota.
+        const d = Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y);
+        pointer.speed = Math.max(pointer.speed, d * 60);
+      }
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.active = true;
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      pointer.x = pointer.downX = e.clientX;
+      pointer.y = pointer.downY = e.clientY;
+      pointer.active = true;
+      pointer.down = true;
+      pointer.downAt = clock;
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      const quick = clock - pointer.downAt < 0.18;
+      const still = Math.hypot(e.clientX - pointer.downX, e.clientY - pointer.downY) < 8;
+      if (quick && still) burst(e.clientX, e.clientY);
+      pointer.down = false;
+      if (e.pointerType !== 'mouse') pointer.active = false;
+    });
+    canvas.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'mouse') pointer.active = false;
+    });
+    canvas.addEventListener('dblclick', toggleFullscreen);
+
+    function toggleFullscreen() {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Espacio/Enter sobre un botón lo activan; no deben pausar la animación.
+      if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return;
+      switch (e.key.toLowerCase()) {
+        case 'c': setPalette(paletteIndex + 1); showHud(2500); break;
+        case 't': trails = !trails; break;
+        case 'f': toggleFullscreen(); break;
+        case 'r': reset(); break;
+        case 's': toggleSound(); break;
+        case 'd': toggleDelaunay(); break;
+        case '?': setInfo(info.hidden); break;
+        case 'escape': if (!info.hidden) setInfo(false); break;
+        case 'h': showHud(); break;
+        case ' ': paused = !paused; e.preventDefault(); break;
+        default: return;
+      }
+    });
+
+    window.addEventListener('resize', resize);
+    setPalette(0);
+    resize();
+    showHud(6000);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
